@@ -117,3 +117,19 @@ export async function loadMarket() {
   const trackedViews = [...new Set(funds.map((f) => f.viewId).filter(Boolean) as string[])];
   return { asOf, indices, snapshot, brief, news, trackedViews };
 }
+
+export async function loadExplore() {
+  await connection();
+  const admin = await isAdmin();
+  const [metrics, groups, prefs, watch] = await Promise.all([
+    research.listFundMetrics<import("@/lib/pipeline/discovery").DiscoveryFundData>(),
+    research.listDiscoveryGroups<import("@/lib/pipeline/discovery").DiscoveryGroupData>(),
+    admin ? research.getPreferences().catch(() => null) : Promise.resolve(null),
+    admin ? research.listWatchlist().catch(() => []) : Promise.resolve([]),
+  ]);
+  const { toUniverseRow, groupLabelMap } = await import("@/lib/explore");
+  const labels = groupLabelMap(groups);
+  const rows = metrics.map((m) => toUniverseRow(m, labels[m.groupKey] ?? m.groupKey)).filter((r): r is NonNullable<typeof r> => r !== null);
+  const computedAt = groups.map((g) => g.computedAt).sort().at(-1) ?? null;
+  return { admin, rows, groups, prefs, watch, computedAt };
+}
