@@ -40,8 +40,8 @@ npx tsx --env-file=.env.local scripts/smoke-sources.ts   # live check of every d
 | Appwrite persistence | setup script (idempotent re-run), full pipeline | 10 tables created; re-run made no changes |
 | News (Tavily + GNews) | report generation | 27 items, dated, de-duplicated; one GNews query 400 (rephrased) |
 | Gemini structured output | local and **production** report generation | `gemini-3.8-flash`, valid on attempt 1 (prod: 79 s incl. data refresh) |
-| Email (Resend) | `scripts/send-test.ts email` + `scripts/email-status.ts` | Accepted, then Resend `last_event: delivered` |
-| Telegram | pending bot token | not yet verified |
+| Email (Resend) | local + production test sends; `scripts/email-status.ts` | Accepted, then Resend `last_event: delivered`; report page shows "Delivered (confirmed by provider)" |
+| Telegram | `scripts/send-test.ts telegram` and production test send (bot @Mutualfund_friend_bot) | Accepted by Telegram API (message ids recorded); bots receive no delivery receipts |
 | WhatsApp | pending Meta setup | not verified — code path reports `awaiting_configuration` |
 | Cron auth + idempotency | production `curl` without/with secret, twice | 401 without secret; second call `skipped: already completed` |
 | Admin API | local `curl` | unauth → 401; wrong password → 401; invalid/nonexistent/duplicate codes rejected; add → NAV backfilled; remove → soft; remove again → error; past reports intact |
@@ -57,5 +57,5 @@ mitigated by direct labels and adjacent tables).
 
 - No automated browser (E2E) tests; flows were checked manually and via API calls.
 - Repository functions are exercised against the real Appwrite project, not by unit tests with a mocked SDK.
-- Telegram and WhatsApp sends have not been verified end-to-end yet (credentials pending).
+- WhatsApp Cloud API sends have not been verified (Meta credentials/template pending); a wa.me one-tap share link is available meanwhile.
 - The validator checks that each stated number exists in the input, not which metric it is attached to.
