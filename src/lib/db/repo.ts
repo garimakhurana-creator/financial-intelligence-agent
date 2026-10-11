@@ -41,7 +41,7 @@ async function listAll(tableId: TableId, queries: string[] = [], max = 5000): Pr
 async function getRow(tableId: TableId, id: string): Promise<Row | null> {
   const { db, databaseId } = appwrite();
   try {
-    return await db.getRow({ databaseId, tableId, rowId: id });
+    return await db.getRow<Row>({ databaseId, tableId, rowId: id });
   } catch (e) {
     if (isNotFound(e)) return null;
     throw e;

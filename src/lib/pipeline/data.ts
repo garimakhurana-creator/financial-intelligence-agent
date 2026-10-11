@@ -308,9 +308,23 @@ export async function buildIndexPerformance(id: IndexId, asOf: ISODate): Promise
   };
 }
 
+/**
+ * FX must be measured over the same dates as the overseas index it converts, otherwise
+ * "USD return + currency move" will not add up to the INR return. Anchor USD/INR to the
+ * Nasdaq-100's latest close.
+ */
+export async function buildIndexSet(ids: IndexId[], asOf: ISODate): Promise<IndexPerformance[]> {
+  const out = await Promise.all(ids.filter((id) => id !== "USDINR").map((id) => buildIndexPerformance(id, asOf)));
+  if (ids.includes("USDINR")) {
+    const anchor = out.find((i) => i.id === "NASDAQ100")?.current?.date ?? (await buildIndexPerformance("NASDAQ100", asOf)).current?.date ?? asOf;
+    out.push(await buildIndexPerformance("USDINR", anchor));
+  }
+  return ids.map((id) => out.find((i) => i.id === id)!);
+}
+
 export async function buildMarketOverview(asOf: ISODate) {
   const ids = new Set<IndexId>([...HEADLINE_INDICES, ...Object.values(VIEWS).flatMap((v) => v.marketIndices), ...DERIVED_INDEX_IDS]);
-  const indices = await Promise.all([...ids].map((id) => buildIndexPerformance(id, asOf)));
+  const indices = await buildIndexSet([...ids], asOf);
   const snapshot = await repo.getLatestMarketSnapshot<IndexSnapshot[]>();
   return { indices, snapshot };
 }
