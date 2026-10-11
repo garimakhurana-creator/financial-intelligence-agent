@@ -37,17 +37,19 @@ Settings & funds (`/manage`).
 
 ## Stack
 
-Next.js 16 (App Router, TypeScript) · Tailwind CSS 4 + shadcn/ui · Recharts · Appwrite TablesDB · Gemini Flash
+Next.js 16 (App Router, TypeScript) · Tailwind CSS 4 + shadcn/ui · Recharts · Postgres on Nhost · Gemini Flash
 (`@google/genai`) · unpdf · Tavily + GNews · Resend · Telegram Bot API · WhatsApp Business Cloud API · Vercel + Cron.
 
-> The brief names Supabase; this build uses **Appwrite TablesDB** by the owner's choice (`src/lib/db/`).
+> The brief names Supabase; this build uses **Postgres hosted on Nhost** (`src/lib/db/`). It started on Appwrite
+> TablesDB and moved to Postgres when Appwrite's free monthly read quota ran out; the data layer was the only
+> code that changed.
 
 ## Run locally
 
 ```bash
 npm install
 cp .env.example .env.local                                   # fill in values
-npx tsx --env-file=.env.local scripts/setup-db.ts            # create/migrate Appwrite tables (idempotent)
+npx tsx --env-file=.env.local scripts/setup-db.ts            # create/migrate Postgres tables (idempotent)
 npx tsx --env-file=.env.local scripts/run-data.ts            # seed Meera's 5 funds, ingest NAVs/indices/peers
 npx tsx --env-file=.env.local scripts/refresh-discovery.ts   # Explore Funds metrics + ranking (~20 s)
 npx tsx --env-file=.env.local scripts/refresh-news.ts        # topic news + market brief (~90 s)

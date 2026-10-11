@@ -1,10 +1,17 @@
-// Appwrite TablesDB schema — single source of truth for scripts/setup-db.ts.
+// Postgres schema (Nhost) — single source of truth for scripts/setup-db.ts.
 // Bump SCHEMA_VERSION whenever a table/column/index is added; the setup script is additive and
 // idempotent (it creates what is missing and never drops data).
+//
+// Every table has a text primary key "id" (deterministic ids such as "n_119551_20261009" make
+// writes idempotent). Timestamps are stored as ISO-8601 UTC text, exactly as the app produces
+// and compares them; JSON payloads are text holding JSON.
+
+// v3 (2026-10-11): moved from Appwrite TablesDB to Postgres (Nhost) after the Appwrite free-plan
+// read quota ran out. Same tables and columns.
 
 // v2 (2026-10-11): fund_metrics, discovery_groups, watchlist, holdings, preferences, fund_analyses,
 // market_briefs; market_news.topics + market_news.relevance.
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 export type ColumnType = "varchar" | "text" | "longtext" | "integer" | "double" | "boolean" | "datetime";
 
@@ -249,3 +256,28 @@ export const TABLES = {
 } satisfies Record<string, TableDef>;
 
 export type TableId = keyof typeof TABLES;
+
+const SQL_TYPE: Record<ColumnType, string> = {
+  varchar: "text",
+  text: "text",
+  longtext: "text",
+  integer: "integer",
+  double: "double precision",
+  boolean: "boolean",
+  datetime: "text",
+};
+
+/** Idempotent DDL for every table: create if missing, add missing columns, create indexes. */
+export function schemaStatements(): string[] {
+  const out: string[] = [];
+  for (const table of Object.values(TABLES) as TableDef[]) {
+    const cols = table.columns.map((c) => `"${c.key}" ${SQL_TYPE[c.type]}${c.array ? "[]" : ""}${c.required ? " not null" : ""}`);
+    out.push(`create table if not exists "${table.id}" (id text primary key, ${cols.join(", ")})`);
+    for (const c of table.columns) out.push(`alter table "${table.id}" add column if not exists "${c.key}" ${SQL_TYPE[c.type]}${c.array ? "[]" : ""}`);
+    for (const ix of table.indexes) {
+      const cols = ix.columns.map((col, i) => `"${col}"${ix.orders?.[i] === "DESC" ? " desc" : ""}`).join(", ");
+      out.push(`create ${ix.type === "unique" ? "unique " : ""}index if not exists "${table.id}_${ix.key}" on "${table.id}" (${cols})`);
+    }
+  }
+  return out;
+}

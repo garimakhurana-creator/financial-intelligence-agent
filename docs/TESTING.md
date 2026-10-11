@@ -44,7 +44,7 @@ and clearly labelled. Analyses created from it during testing were deleted from 
 | MFapi / AMFI | smoke script; discovery run; add-fund and analysis APIs | 619 Direct-Growth schemes across 19 categories (505 ranked); invalid codes rejected |
 | Indices (Yahoo + NSE) | production daily job | 8/8 series incl. NSE Smallcap 100 from Vercel `bom1` |
 | Numbers vs source | UTI Nifty 50 Index Fund vs Nifty 50 (1M −3.91% vs −3.89%); FX decomposition 0.244% & 0.622% → 0.868% | consistent |
-| Appwrite | schema v1 → v2 migration (additive), all reads/writes | 17 tables; re-running setup makes no changes |
+| Postgres (Nhost) | schema v3 setup, then a full data load and report run | 17 tables; re-running setup makes no changes |
 | News (Tavily + GNews) | daily job in production | 55 topic items, 54 with validated explanations |
 | Gemini | weekly report, market brief, fund analysis, factsheet extraction — local and production | `gemini-3.8-flash`; validated outputs; template fallback exercised when validation failed |
 | Email (Resend) | test sends; status sync | accepted, then `delivered` per Resend events |
@@ -65,6 +65,6 @@ low-contrast slots are relieved by legends and the numeric labels under each cha
 ## Not covered / limitations
 
 - No automated end-to-end browser tests; flows were checked manually and through the HTTP APIs.
-- Repository functions are exercised against the real Appwrite project rather than a mocked SDK.
+- Repository functions are exercised against the real Nhost Postgres database rather than a mock.
 - A real (non-synthetic) factsheet PDF has not yet been run through the upload path.
 - Validators check that each stated number exists in the verified input, not which metric it is attached to.

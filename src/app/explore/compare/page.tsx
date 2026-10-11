@@ -3,7 +3,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { Card, PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import * as research from "@/lib/db/research";
+import * as cached from "@/lib/db/cached";
 import { groupLabelMap, toUniverseRow, type UniverseRow } from "@/lib/explore";
 import type { DiscoveryFundData, DiscoveryGroupData } from "@/lib/pipeline/discovery";
 import { cn } from "@/lib/utils";
@@ -56,7 +56,7 @@ async function Compare({ searchParams }: { searchParams: PageProps<"/explore/com
       </Card>
     );
   }
-  const [metrics, groups] = await Promise.all([research.getFundMetricsMany<DiscoveryFundData>(codes), research.listDiscoveryGroups<DiscoveryGroupData>()]);
+  const [metrics, groups] = await Promise.all([cached.fundMetricsMany<DiscoveryFundData>(codes), cached.discoveryGroups<DiscoveryGroupData>()]);
   const labels = groupLabelMap(groups);
   const rows = codes.map((c) => metrics.find((m) => m.schemeCode === c)).flatMap((m) => (m ? [toUniverseRow(m, labels[m.groupKey] ?? m.groupKey)!] : []));
   const missing = codes.filter((c) => !rows.some((r) => r.code === c));

@@ -1,0 +1,227 @@
+import Link from "next/link";
+import { ArrowRight, ArrowUpRight } from "lucide-react";
+import { Carousel } from "@/components/carousel";
+import { Sparkline } from "@/components/charts";
+import { formatHuman } from "@/lib/dates";
+import { cleanTitle, topicArt } from "@/lib/news/art";
+import type { FundPerformance, IndexPerformance } from "@/lib/pipeline/data";
+import { describeMove, describeVsPeers, FUND_EMOJI, FUND_GRADIENT, FUND_KIND, INDEX_WORDS, thousandBecomes, WEEK_WEATHER } from "@/lib/plain";
+import { metricTriples } from "@/lib/report/input";
+import { screenFund } from "@/lib/report/screening";
+import type { ViewId } from "@/lib/catalog";
+import { cn } from "@/lib/utils";
+
+// Words-first building blocks for the home page. Every word comes from fixed thresholds in
+// lib/plain.ts; the exact numbers live behind "Show me the numbers".
+
+export const shortName = (n: string) => n.replace(/\s*-\s*Direct Plan.*$/i, "").replace(/\s*-\s*Growth.*$/i, "").replace(/\s+Fund$/i, "");
+const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
+const gradientOf = (view: string | null) => FUND_GRADIENT[(view ?? "") as ViewId] ?? ["#64748b", "#0f766e"];
+const emojiOf = (view: string | null) => FUND_EMOJI[(view ?? "") as ViewId] ?? "💼";
+
+export function fundStatus(f: FundPerformance): { emoji: string; text: string; cls: string } {
+  if (!f.nav) return { emoji: "⏳", text: "Waiting for price", cls: "bg-muted text-[var(--ink-secondary)]" };
+  if (screenFund(f.viewId, metricTriples(f)).flag) return { emoji: "👀", text: "Keep an eye", cls: "bg-[var(--tint-warning)] text-foreground" };
+  return { emoji: "👍", text: "On track", cls: "bg-[var(--tint-good)] text-foreground" };
+}
+
+// ---------------------------------------------------------------------------------------------
+
+export function WeatherHero({ label, reason, weekEnding, reportId }: { label: string | null; reason: string | null; weekEnding: string | null; reportId: string | null }) {
+  const w = label ? WEEK_WEATHER[label] : null;
+  if (!w) {
+    return (
+      <section className="rounded-3xl border bg-card p-6 shadow-card sm:p-8">
+        <div className="text-6xl" aria-hidden>
+          🌱
+        </div>
+        <h2 className="font-display mt-3 text-3xl font-semibold">Your first weekly check-in is on its way</h2>
+        <p className="mt-2 text-[var(--ink-secondary)]">It arrives on Saturday morning.</p>
+      </section>
+    );
+  }
+  return (
+    <section className="relative overflow-hidden rounded-3xl p-6 text-[#16181d] shadow-card sm:p-8" style={{ background: `linear-gradient(135deg, ${w.from}, ${w.to})` }}>
+      <span aria-hidden className="float-slow pointer-events-none absolute -right-4 -top-6 text-[9rem] leading-none sm:right-6 sm:top-2 sm:text-[10rem]">
+        {w.emoji}
+      </span>
+      <div className="relative max-w-xl">
+        <p className="text-sm font-medium opacity-70">This week{weekEnding ? ` · up to ${formatHuman(weekEnding)}` : ""}</p>
+        <h2 className="font-display mt-1 text-4xl font-bold tracking-tight sm:text-5xl">{w.title}</h2>
+        <p className="mt-3 text-lg font-medium">{w.line}</p>
+        {reason && <p className="mt-2 text-[15px] leading-relaxed opacity-80">{reason}</p>}
+        <div className="mt-5 flex flex-wrap items-center gap-3">
+          {reportId && (
+            <Link href={`/reports/${reportId}`} className="inline-flex items-center gap-1.5 rounded-full bg-[#16181d] px-4 py-2 text-sm font-medium text-white hover:bg-black">
+              Read this week&apos;s story <ArrowRight className="size-4" aria-hidden />
+            </Link>
+          )}
+          <span className="text-xs opacity-70">A check-in, not advice to buy or sell.</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
+
+export function StoryStrip({ funds, indices, news }: { funds: FundPerformance[]; indices: IndexPerformance[]; news: { id: string; title: string; topics: string[] }[] }) {
+  return (
+    <Carousel label="Your week in 30 seconds">
+      {funds.map((f) => {
+        const m = f.windows["1M"];
+        const move = describeMove(m.fund.returnPct);
+        const k = thousandBecomes(m.fund.returnPct);
+        const [a, b] = gradientOf(f.viewId);
+        return (
+          <Link
+            key={f.schemeCode}
+            href={`/funds/${f.schemeCode}`}
+            className="story-card lift relative flex h-[18rem] w-[15rem] shrink-0 snap-start flex-col overflow-hidden rounded-3xl p-5 text-white shadow-card"
+            style={{ background: `linear-gradient(160deg, ${a}, ${b})` }}
+          >
+            <span aria-hidden className="absolute -bottom-4 -right-3 text-[6.5rem] leading-none opacity-25">
+              {emojiOf(f.viewId)}
+            </span>
+            <span className="text-3xl" aria-hidden>
+              {emojiOf(f.viewId)}
+            </span>
+            <div className="mt-2 text-sm font-medium leading-snug opacity-90">{shortName(f.schemeName)}</div>
+            <div className="mt-auto">
+              <div className="text-xs font-medium uppercase tracking-wider opacity-75">This month</div>
+              <div className="font-display mt-1 text-2xl font-bold leading-tight">
+                {move.words} <span aria-hidden>{move.emoji}</span>
+              </div>
+              {k !== null && (
+                <div className="mt-2 inline-flex rounded-full bg-black/20 px-2.5 py-1 text-xs font-medium backdrop-blur-sm">
+                  ₹1,000 → {inr(k)}
+                </div>
+              )}
+              <div className="mt-2 text-xs opacity-85">{describeVsPeers(m.vsPeerPp).words}</div>
+            </div>
+          </Link>
+        );
+      })}
+
+      <Link href="/market" className="story-card lift relative flex h-[18rem] w-[15rem] shrink-0 snap-start flex-col overflow-hidden rounded-3xl bg-[#16181d] p-5 text-white shadow-card">
+        <span className="text-3xl" aria-hidden>
+          🌡️
+        </span>
+        <div className="mt-2 text-sm font-medium opacity-80">The market this week</div>
+        <ul className="mt-auto space-y-3">
+          {indices.map((ix) => {
+            const mv = describeMove(ix.windows["1W"].returnPct);
+            return (
+              <li key={ix.id}>
+                <div className="text-xs opacity-70">{INDEX_WORDS[ix.id] ?? ix.name}</div>
+                <div className="font-medium">
+                  {mv.words} <span aria-hidden>{mv.emoji}</span>
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      </Link>
+
+      {news.slice(0, 3).map((n) => {
+        const art = topicArt(n.topics);
+        return (
+          <Link
+            key={n.id}
+            href="/market"
+            className="story-card lift relative flex h-[18rem] w-[15rem] shrink-0 snap-start flex-col overflow-hidden rounded-3xl p-5 text-white shadow-card"
+            style={{ background: `linear-gradient(160deg, ${art.from}, ${art.to})` }}
+          >
+            <span aria-hidden className="absolute -bottom-4 -right-3 text-[6.5rem] leading-none opacity-25">
+              {art.emoji}
+            </span>
+            <span className="w-fit rounded-full bg-black/20 px-2.5 py-1 text-xs font-medium">📰 Heard this week</span>
+            <div className="font-display mt-3 line-clamp-5 text-lg font-semibold leading-snug">{cleanTitle(n.title)}</div>
+            <div className="mt-auto inline-flex items-center gap-1 text-xs font-medium opacity-90">
+              Swipe the news <ArrowUpRight className="size-3.5" aria-hidden />
+            </div>
+          </Link>
+        );
+      })}
+    </Carousel>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
+
+export function FundCards({ funds }: { funds: FundPerformance[] }) {
+  return (
+    <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {funds.map((f) => {
+        const m = f.windows["1M"];
+        const move = describeMove(m.fund.returnPct);
+        const k = thousandBecomes(m.fund.returnPct);
+        const vs = describeVsPeers(m.vsPeerPp);
+        const s = fundStatus(f);
+        const [a, b] = gradientOf(f.viewId);
+        return (
+          <li key={f.schemeCode}>
+            <Link href={`/funds/${f.schemeCode}`} className="lift group flex h-full flex-col rounded-3xl border bg-card p-5 shadow-card">
+              <div className="flex items-start gap-3">
+                <span aria-hidden className="grid size-12 shrink-0 place-items-center rounded-2xl text-2xl" style={{ background: `linear-gradient(135deg, ${a}, ${b})` }}>
+                  {emojiOf(f.viewId)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <div className="font-semibold leading-snug group-hover:underline">{shortName(f.schemeName)}</div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">{f.viewId ? FUND_KIND[f.viewId as ViewId] : f.amfiCategory}</div>
+                </div>
+              </div>
+              <div className="mt-4 flex items-end justify-between gap-3">
+                <div>
+                  <div className="text-xs text-muted-foreground">This month</div>
+                  <div className={cn("font-display text-xl font-bold", move.tone === "good" && "text-[var(--up)]", move.tone === "bad" && "text-[var(--down)]")}>
+                    {move.words} <span aria-hidden>{move.emoji}</span>
+                  </div>
+                </div>
+                <div className="w-24 shrink-0">
+                  <Sparkline data={f.chart.slice(-23)} height={36} />
+                </div>
+              </div>
+              {k !== null && (
+                <p className="mt-2 text-sm text-[var(--ink-secondary)]">
+                  ₹1,000 a month ago is about <span className="font-semibold text-foreground">{inr(k)}</span> now
+                </p>
+              )}
+              <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
+                <span className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium", s.cls)}>
+                  <span aria-hidden>{s.emoji}</span> {s.text}
+                </span>
+                <span className="text-xs text-muted-foreground">{vs.words}</span>
+              </div>
+            </Link>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
+
+/** Three headline indices as moods, for the market page header. */
+export function MarketMood({ indices }: { indices: IndexPerformance[] }) {
+  return (
+    <ul className="grid gap-3 sm:grid-cols-3">
+      {indices.map((ix) => {
+        const mv = describeMove(ix.windows["1W"].returnPct);
+        return (
+          <li key={ix.id} className="flex items-center gap-3 rounded-2xl border bg-card p-4 shadow-card">
+            <span className="grid size-12 shrink-0 place-items-center rounded-2xl bg-muted text-2xl" aria-hidden>
+              {mv.emoji}
+            </span>
+            <div className="min-w-0">
+              <div className="text-xs text-muted-foreground">{INDEX_WORDS[ix.id] ?? ix.name} · this week</div>
+              <div className={cn("font-display text-lg font-semibold", mv.tone === "good" && "text-[var(--up)]", mv.tone === "bad" && "text-[var(--down)]")}>{mv.words}</div>
+              <div className="truncate text-[11px] text-muted-foreground">{ix.name}</div>
+            </div>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}

@@ -1,4 +1,4 @@
-// Generates a manual report from the data already in Appwrite and prints it.
+// Generates a manual report from the data already in the database and prints it.
 // Usage: npx tsx --env-file=.env.local scripts/generate-report.ts [--reuse-news]
 import { createWeeklyReport } from "@/lib/report/build";
 

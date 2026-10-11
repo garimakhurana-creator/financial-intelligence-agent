@@ -1,65 +1,21 @@
-import { AppwriteException, ID, Query, type Models } from "node-appwrite";
-import { appwrite } from "@/lib/db/client";
-import type { TableId } from "@/lib/db/schema";
+import { randomUUID } from "node:crypto";
+import { getRow, insertIfNew, sql, updateRow, upsertRow, upsertRows, type Row } from "@/lib/db/client";
 import type { Observation } from "@/lib/calc/returns";
 import type { ISODate } from "@/lib/dates";
 
 // ---------------------------------------------------------------------------------------------
 // Generic helpers
 
-type Row = Models.DefaultRow;
-
-export const isConflict = (e: unknown) => e instanceof AppwriteException && e.code === 409;
-export const isNotFound = (e: unknown) => e instanceof AppwriteException && e.code === 404;
-
-/** Appwrite row IDs: max 36 chars of [a-zA-Z0-9._-], not starting with a special char. */
+/** Row ids: max 36 chars of [a-zA-Z0-9._-], starting with a letter or digit. Deterministic ids make writes idempotent. */
 export function rowId(...parts: (string | number)[]): string {
   const id = parts.join("_").replace(/[^a-zA-Z0-9._-]/g, "-").slice(0, 36);
   return /^[a-zA-Z0-9]/.test(id) ? id : `x${id.slice(0, 35)}`;
 }
 
+/** A random 20-character id for rows without a natural key (on-demand reports, analyses). */
+export const newId = () => randomUUID().replaceAll("-", "").slice(0, 20);
+
 const nowIso = () => new Date().toISOString();
-
-async function listAll(tableId: TableId, queries: string[] = [], max = 5000): Promise<Row[]> {
-  const { db, databaseId } = appwrite();
-  const out: Row[] = [];
-  let cursor: string | undefined;
-  while (out.length < max) {
-    const page = await db.listRows({
-      databaseId,
-      tableId,
-      queries: [...queries, Query.limit(500), ...(cursor ? [Query.cursorAfter(cursor)] : [])],
-      total: false,
-    });
-    out.push(...page.rows);
-    if (page.rows.length < 500) break;
-    cursor = page.rows[page.rows.length - 1].$id;
-  }
-  return out;
-}
-
-async function getRow(tableId: TableId, id: string): Promise<Row | null> {
-  const { db, databaseId } = appwrite();
-  try {
-    return await db.getRow<Row>({ databaseId, tableId, rowId: id });
-  } catch (e) {
-    if (isNotFound(e)) return null;
-    throw e;
-  }
-}
-
-async function upsert(tableId: TableId, id: string, data: Record<string, unknown>): Promise<Row> {
-  const { db, databaseId } = appwrite();
-  return db.upsertRow({ databaseId, tableId, rowId: id, data });
-}
-
-/** Bulk upsert in chunks (Appwrite bulk endpoints accept a bounded batch). */
-async function upsertMany(tableId: TableId, rows: (Record<string, unknown> & { $id: string })[]) {
-  const { db, databaseId } = appwrite();
-  for (let i = 0; i < rows.length; i += 100) {
-    await db.upsertRows({ databaseId, tableId, rows: rows.slice(i, i + 100) });
-  }
-}
 
 // ---------------------------------------------------------------------------------------------
 // Tracked funds
@@ -101,7 +57,8 @@ function toFund(r: Row): TrackedFund {
 }
 
 export async function listFunds(opts: { activeOnly?: boolean } = {}): Promise<TrackedFund[]> {
-  const rows = await listAll("tracked_funds", opts.activeOnly ? [Query.equal("active", true)] : []);
+  const db = sql();
+  const rows = opts.activeOnly ? await db`select * from tracked_funds where active = true` : await db`select * from tracked_funds`;
   return rows.map(toFund).sort((a, b) => (a.addedAt ?? "").localeCompare(b.addedAt ?? "") || a.schemeCode - b.schemeCode);
 }
 
@@ -111,7 +68,7 @@ export async function getFund(schemeCode: number): Promise<TrackedFund | null> {
 }
 
 export async function saveFund(f: Omit<TrackedFund, "lastNavDate" | "lastRefreshedAt" | "removedAt" | "addedAt"> & { addedAt?: string }) {
-  await upsert("tracked_funds", String(f.schemeCode), {
+  await upsertRow("tracked_funds", String(f.schemeCode), {
     scheme_code: f.schemeCode,
     scheme_name: f.schemeName,
     fund_house: f.fundHouse,
@@ -128,8 +85,7 @@ export async function saveFund(f: Omit<TrackedFund, "lastNavDate" | "lastRefresh
 }
 
 export async function updateFund(schemeCode: number, patch: Record<string, unknown>) {
-  const { db, databaseId } = appwrite();
-  await db.updateRow({ databaseId, tableId: "tracked_funds", rowId: String(schemeCode), data: patch });
+  await updateRow("tracked_funds", String(schemeCode), patch);
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -137,10 +93,10 @@ export async function updateFund(schemeCode: number, patch: Record<string, unkno
 
 export async function saveNavHistory(schemeCode: number, series: Observation[], source: string) {
   const retrieved_at = nowIso();
-  await upsertMany(
+  await upsertRows(
     "nav_history",
     series.map((o) => ({
-      $id: rowId("n", schemeCode, o.date.replaceAll("-", "")),
+      id: rowId("n", schemeCode, o.date.replaceAll("-", "")),
       scheme_code: schemeCode,
       date: o.date,
       nav: o.value,
@@ -151,33 +107,23 @@ export async function saveNavHistory(schemeCode: number, series: Observation[], 
 }
 
 export async function getNavSeries(schemeCode: number, from: ISODate): Promise<Observation[]> {
-  const rows = await listAll("nav_history", [
-    Query.equal("scheme_code", schemeCode),
-    Query.greaterThanEqual("date", from),
-    Query.orderAsc("date"),
-    Query.select(["date", "nav", "source", "retrieved_at"]),
-  ]);
+  const db = sql();
+  const rows = await db`select "date", nav from nav_history where scheme_code = ${schemeCode} and "date" >= ${from} order by "date" asc`;
   return rows.map((r) => ({ date: r.date, value: r.nav }));
 }
 
 export async function getNavMeta(schemeCode: number): Promise<{ source: string; retrievedAt: string } | null> {
-  const { db, databaseId } = appwrite();
-  const page = await db.listRows({
-    databaseId,
-    tableId: "nav_history",
-    queries: [Query.equal("scheme_code", schemeCode), Query.orderDesc("date"), Query.limit(1)],
-    total: false,
-  });
-  const r = page.rows[0];
+  const db = sql();
+  const [r] = await db`select source, retrieved_at from nav_history where scheme_code = ${schemeCode} order by "date" desc limit 1`;
   return r ? { source: r.source, retrievedAt: r.retrieved_at } : null;
 }
 
 export async function saveIndexHistory(indexId: string, series: Observation[], source: string) {
   const retrieved_at = nowIso();
-  await upsertMany(
+  await upsertRows(
     "index_history",
     series.map((o) => ({
-      $id: rowId(indexId, o.date.replaceAll("-", "")),
+      id: rowId(indexId, o.date.replaceAll("-", "")),
       index_id: indexId,
       date: o.date,
       value: o.value,
@@ -188,31 +134,35 @@ export async function saveIndexHistory(indexId: string, series: Observation[], s
 }
 
 export async function getIndexSeries(indexId: string, from: ISODate): Promise<{ series: Observation[]; source: string | null; retrievedAt: string | null }> {
-  const rows = await listAll("index_history", [
-    Query.equal("index_id", indexId),
-    Query.greaterThanEqual("date", from),
-    Query.orderAsc("date"),
-  ]);
+  const db = sql();
+  const rows = await db`select "date", value, source, retrieved_at from index_history where index_id = ${indexId} and "date" >= ${from} order by "date" asc`;
   const last = rows.at(-1);
   return { series: rows.map((r) => ({ date: r.date, value: r.value })), source: last?.source ?? null, retrievedAt: last?.retrieved_at ?? null };
+}
+
+/** Remove specific index rows (used by maintenance scripts). */
+export async function deleteIndexRows(indexId: string, dates: ISODate[]) {
+  if (dates.length === 0) return 0;
+  const db = sql();
+  const out = await db`delete from index_history where index_id = ${indexId} and "date" in ${db(dates)}`;
+  return out.count;
 }
 
 // ---------------------------------------------------------------------------------------------
 // Market snapshots, peer stats, performance snapshots
 
 export async function saveMarketSnapshot(date: ISODate, data: unknown, source: string) {
-  await upsert("market_snapshots", rowId("m", date.replaceAll("-", "")), { date, data: JSON.stringify(data), source, retrieved_at: nowIso() });
+  await upsertRow("market_snapshots", rowId("m", date.replaceAll("-", "")), { date, data: JSON.stringify(data), source, retrieved_at: nowIso() });
 }
 
 export async function getLatestMarketSnapshot<T>(): Promise<{ date: ISODate; data: T; source: string; retrievedAt: string } | null> {
-  const { db, databaseId } = appwrite();
-  const page = await db.listRows({ databaseId, tableId: "market_snapshots", queries: [Query.orderDesc("date"), Query.limit(1)], total: false });
-  const r = page.rows[0];
+  const db = sql();
+  const [r] = await db`select * from market_snapshots order by "date" desc limit 1`;
   return r ? { date: r.date, data: JSON.parse(r.data) as T, source: r.source, retrievedAt: r.retrieved_at } : null;
 }
 
 export async function savePeerStats(peerKey: string, asOf: ISODate, universeSize: number, stats: unknown, methodVersion: string, source: string) {
-  await upsert("peer_stats", rowId(peerKey, asOf.replaceAll("-", "")), {
+  await upsertRow("peer_stats", rowId(peerKey, asOf.replaceAll("-", "")), {
     peer_key: peerKey,
     as_of: asOf,
     universe_size: universeSize,
@@ -229,19 +179,13 @@ export async function getPeerStats<T>(peerKey: string, asOf: ISODate): Promise<{
 }
 
 export async function getLatestPeerStats<T>(peerKey: string): Promise<{ asOf: ISODate; stats: T; computedAt: string; source: string } | null> {
-  const { db, databaseId } = appwrite();
-  const page = await db.listRows({
-    databaseId,
-    tableId: "peer_stats",
-    queries: [Query.equal("peer_key", peerKey), Query.orderDesc("as_of"), Query.limit(1)],
-    total: false,
-  });
-  const r = page.rows[0];
+  const db = sql();
+  const [r] = await db`select * from peer_stats where peer_key = ${peerKey} order by as_of desc limit 1`;
   return r ? { asOf: r.as_of, stats: JSON.parse(r.stats) as T, computedAt: r.computed_at, source: r.source } : null;
 }
 
 export async function savePerformanceSnapshot(schemeCode: number, asOf: ISODate, data: unknown, calcVersion: string) {
-  await upsert("performance_snapshots", rowId("p", schemeCode, asOf.replaceAll("-", "")), {
+  await upsertRow("performance_snapshots", rowId("p", schemeCode, asOf.replaceAll("-", "")), {
     scheme_code: schemeCode,
     as_of: asOf,
     data: JSON.stringify(data),
@@ -251,14 +195,9 @@ export async function savePerformanceSnapshot(schemeCode: number, asOf: ISODate,
 }
 
 export async function listPerformanceSnapshots<T>(schemeCode: number, limit = 26): Promise<{ asOf: ISODate; data: T }[]> {
-  const { db, databaseId } = appwrite();
-  const page = await db.listRows({
-    databaseId,
-    tableId: "performance_snapshots",
-    queries: [Query.equal("scheme_code", schemeCode), Query.orderDesc("as_of"), Query.limit(limit)],
-    total: false,
-  });
-  return page.rows.map((r) => ({ asOf: r.as_of, data: JSON.parse(r.data) as T })).reverse();
+  const db = sql();
+  const rows = await db`select as_of, data from performance_snapshots where scheme_code = ${schemeCode} order by as_of desc limit ${limit}`;
+  return rows.map((r) => ({ asOf: r.as_of, data: JSON.parse(r.data) as T })).reverse();
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -276,10 +215,10 @@ export interface NewsItem {
 
 export async function saveNews(weekOf: ISODate, items: (NewsItem & { id: string })[]) {
   const retrieved_at = nowIso();
-  await upsertMany(
+  await upsertRows(
     "market_news",
     items.map((n) => ({
-      $id: n.id,
+      id: n.id,
       url: n.url,
       title: n.title.slice(0, 500),
       publisher: n.publisher.slice(0, 128),
@@ -294,9 +233,10 @@ export async function saveNews(weekOf: ISODate, items: (NewsItem & { id: string 
 }
 
 export async function listNews(weekOf: ISODate): Promise<(NewsItem & { id: string })[]> {
-  const rows = await listAll("market_news", [Query.equal("week_of", weekOf), Query.orderDesc("published_at")]);
+  const db = sql();
+  const rows = await db`select * from market_news where week_of = ${weekOf} order by published_at desc nulls last`;
   return rows.map((r) => ({
-    id: r.$id,
+    id: r.id,
     url: r.url,
     title: r.title,
     publisher: r.publisher ?? "",
@@ -325,7 +265,7 @@ export interface StoredReport<R = unknown, I = unknown> {
 
 function toReport<R, I>(r: Row): StoredReport<R, I> {
   return {
-    id: r.$id,
+    id: r.id,
     weekEnding: r.week_ending,
     kind: r.kind,
     assessment: r.assessment,
@@ -338,25 +278,23 @@ function toReport<R, I>(r: Row): StoredReport<R, I> {
   };
 }
 
+/** Insert a report. A scheduled report has a deterministic id, so a second insert for the same week fails. */
 export async function saveReport(rep: Omit<StoredReport, "id" | "createdAt"> & { id?: string }): Promise<string> {
-  const { db, databaseId } = appwrite();
-  const id = rep.id ?? ID.unique();
-  await db.createRow({
-    databaseId,
-    tableId: "weekly_reports",
-    rowId: id,
-    data: {
-      week_ending: rep.weekEnding,
-      kind: rep.kind,
-      assessment: rep.assessment,
-      assessment_reason: rep.assessmentReason,
-      report: JSON.stringify(rep.report),
-      input_snapshot: JSON.stringify(rep.inputSnapshot),
-      generator: rep.generator,
-      model: rep.model,
-      created_at: nowIso(),
-    },
-  });
+  const db = sql();
+  const id = rep.id ?? newId();
+  const row = {
+    id,
+    week_ending: rep.weekEnding,
+    kind: rep.kind,
+    assessment: rep.assessment,
+    assessment_reason: rep.assessmentReason,
+    report: JSON.stringify(rep.report),
+    input_snapshot: JSON.stringify(rep.inputSnapshot),
+    generator: rep.generator,
+    model: rep.model ?? null,
+    created_at: nowIso(),
+  };
+  await db`insert into weekly_reports ${db(row)}`;
   return id;
 }
 
@@ -367,19 +305,10 @@ export async function getReport<R, I>(id: string): Promise<StoredReport<R, I> | 
 
 /** Report list without the heavy JSON payloads. */
 export async function listReports(limit = 52) {
-  const { db, databaseId } = appwrite();
-  const page = await db.listRows({
-    databaseId,
-    tableId: "weekly_reports",
-    queries: [
-      Query.orderDesc("created_at"),
-      Query.limit(limit),
-      Query.select(["$id", "week_ending", "kind", "assessment", "assessment_reason", "generator", "model", "created_at"]),
-    ],
-    total: false,
-  });
-  return page.rows.map((r) => ({
-    id: r.$id,
+  const db = sql();
+  const rows = await db`select id, week_ending, kind, assessment, assessment_reason, generator, model, created_at from weekly_reports order by created_at desc limit ${limit}`;
+  return rows.map((r) => ({
+    id: r.id as string,
     weekEnding: r.week_ending as ISODate,
     kind: r.kind as string,
     assessment: r.assessment as string,
@@ -416,7 +345,7 @@ export interface DeliveryLog {
 
 function toDelivery(r: Row): DeliveryLog {
   return {
-    id: r.$id,
+    id: r.id,
     reportId: r.report_id,
     channel: r.channel,
     isTest: r.is_test,
@@ -435,27 +364,16 @@ function toDelivery(r: Row): DeliveryLog {
  * the idempotency guard that stops a re-run cron job from sending the same report twice.
  */
 export async function claimDelivery(id: string, d: Pick<DeliveryLog, "reportId" | "channel" | "isTest" | "recipientMasked">): Promise<DeliveryLog | null> {
-  const { db, databaseId } = appwrite();
-  try {
-    const r = await db.createRow({
-      databaseId,
-      tableId: "delivery_logs",
-      rowId: id,
-      data: {
-        report_id: d.reportId,
-        channel: d.channel,
-        is_test: d.isTest,
-        status: "pending",
-        recipient_masked: d.recipientMasked,
-        attempts: 0,
-        created_at: nowIso(),
-      },
-    });
-    return toDelivery(r);
-  } catch (e) {
-    if (isConflict(e)) return null;
-    throw e;
-  }
+  const r = await insertIfNew("delivery_logs", id, {
+    report_id: d.reportId,
+    channel: d.channel,
+    is_test: d.isTest,
+    status: "pending",
+    recipient_masked: d.recipientMasked,
+    attempts: 0,
+    created_at: nowIso(),
+  });
+  return r ? toDelivery(r) : null;
 }
 
 export async function getDelivery(id: string): Promise<DeliveryLog | null> {
@@ -464,23 +382,24 @@ export async function getDelivery(id: string): Promise<DeliveryLog | null> {
 }
 
 export async function updateDelivery(id: string, patch: Partial<Pick<DeliveryLog, "status" | "providerMessageId" | "error" | "attempts">>) {
-  const { db, databaseId } = appwrite();
   const data: Record<string, unknown> = { updated_at: nowIso() };
   if (patch.status !== undefined) data.status = patch.status;
   if (patch.providerMessageId !== undefined) data.provider_message_id = patch.providerMessageId;
   if (patch.error !== undefined) data.error = patch.error?.slice(0, 4000) ?? null;
   if (patch.attempts !== undefined) data.attempts = patch.attempts;
-  await db.updateRow({ databaseId, tableId: "delivery_logs", rowId: id, data });
+  await updateRow("delivery_logs", id, data);
 }
 
 export async function listDeliveries(reportId: string): Promise<DeliveryLog[]> {
-  const rows = await listAll("delivery_logs", [Query.equal("report_id", reportId), Query.orderDesc("created_at")]);
+  const db = sql();
+  const rows = await db`select * from delivery_logs where report_id = ${reportId} order by created_at desc`;
   return rows.map(toDelivery);
 }
 
 export async function findDeliveryByProviderId(providerMessageId: string): Promise<DeliveryLog | null> {
-  const rows = await listAll("delivery_logs", [Query.equal("provider_message_id", providerMessageId), Query.limit(1)], 1);
-  return rows[0] ? toDelivery(rows[0]) : null;
+  const db = sql();
+  const [r] = await db`select * from delivery_logs where provider_message_id = ${providerMessageId} limit 1`;
+  return r ? toDelivery(r) : null;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -503,7 +422,7 @@ export interface RunRecord {
 
 function toRun(r: Row): RunRecord {
   return {
-    id: r.$id,
+    id: r.id,
     job: r.job,
     runDate: r.run_date,
     status: r.status,
@@ -529,53 +448,32 @@ export async function claimRun(
   trigger: string,
   opts: { force?: boolean } = {},
 ): Promise<{ run: RunRecord } | { skipped: string; run: RunRecord }> {
-  const { db, databaseId } = appwrite();
   const id = rowId(job, runDate);
   const startedAt = nowIso();
-  try {
-    const r = await db.createRow({
-      databaseId,
-      tableId: "scheduled_runs",
-      rowId: id,
-      data: { job, run_date: runDate, status: "running", trigger, attempts: 1, started_at: startedAt, steps: "[]" },
-    });
-    return { run: toRun(r) };
-  } catch (e) {
-    if (!isConflict(e)) throw e;
-  }
+  const created = await insertIfNew("scheduled_runs", id, { job, run_date: runDate, status: "running", trigger, attempts: 1, started_at: startedAt, steps: "[]" });
+  if (created) return { run: toRun(created) };
   const existing = toRun((await getRow("scheduled_runs", id))!);
   const leaseActive = existing.status === "running" && Date.now() - Date.parse(existing.startedAt) < RUN_LEASE_MS;
   if (!opts.force && (existing.status === "succeeded" || leaseActive)) {
     return { skipped: existing.status === "succeeded" ? "already completed" : "already running", run: existing };
   }
   if (leaseActive) return { skipped: "already running", run: existing };
-  const r = await db.updateRow({
-    databaseId,
-    tableId: "scheduled_runs",
-    rowId: id,
-    data: { status: "running", trigger, attempts: existing.attempts + 1, started_at: startedAt, finished_at: null, error: null, steps: "[]" },
-  });
-  return { run: toRun(r) };
+  const r = await updateRow("scheduled_runs", id, { status: "running", trigger, attempts: existing.attempts + 1, started_at: startedAt, finished_at: null, error: null, steps: "[]" });
+  return { run: toRun(r!) };
 }
 
 export async function finishRun(id: string, status: RunStatus, steps: RunRecord["steps"], error?: string) {
-  const { db, databaseId } = appwrite();
-  await db.updateRow({
-    databaseId,
-    tableId: "scheduled_runs",
-    rowId: id,
-    data: { status, steps: JSON.stringify(steps), finished_at: nowIso(), error: error?.slice(0, 4000) ?? null },
-  });
+  await updateRow("scheduled_runs", id, { status, steps: JSON.stringify(steps), finished_at: nowIso(), error: error?.slice(0, 4000) ?? null });
 }
 
 export async function listRuns(limit = 20): Promise<RunRecord[]> {
-  const { db, databaseId } = appwrite();
-  const page = await db.listRows({ databaseId, tableId: "scheduled_runs", queries: [Query.orderDesc("started_at"), Query.limit(limit)], total: false });
-  return page.rows.map(toRun);
+  const db = sql();
+  const rows = await db`select * from scheduled_runs order by started_at desc limit ${limit}`;
+  return rows.map(toRun);
 }
 
 // ---------------------------------------------------------------------------------------------
-// Market & News topics (schema v2: market_news.topics, market_news.relevance)
+// Market & News topics
 
 export interface TopicNewsRow extends NewsItem {
   id: string;
@@ -586,10 +484,10 @@ export interface TopicNewsRow extends NewsItem {
 /** Upsert topic news. Relevance (Gemini interpretation) is stored as JSON in its own column. */
 export async function saveTopicNews(weekOf: ISODate, items: (NewsItem & { id: string; topics: string[]; relevance?: { why: string; fact: string } | null })[]) {
   const retrieved_at = nowIso();
-  await upsertMany(
+  await upsertRows(
     "market_news",
     items.map((n) => ({
-      $id: n.id,
+      id: n.id,
       url: n.url,
       title: n.title.slice(0, 500),
       publisher: n.publisher.slice(0, 128),
@@ -606,7 +504,8 @@ export async function saveTopicNews(weekOf: ISODate, items: (NewsItem & { id: st
 }
 
 export async function listNewsSince(since: string, max = 400): Promise<TopicNewsRow[]> {
-  const rows = await listAll("market_news", [Query.greaterThanEqual("published_at", since), Query.orderDesc("published_at")], max);
+  const db = sql();
+  const rows = await db`select * from market_news where published_at >= ${since} order by published_at desc limit ${max}`;
   return rows.map((r) => {
     let relevance: TopicNewsRow["relevance"] = null;
     try {
@@ -615,7 +514,7 @@ export async function listNewsSince(since: string, max = 400): Promise<TopicNews
       relevance = null;
     }
     return {
-      id: r.$id,
+      id: r.id,
       url: r.url,
       title: r.title,
       publisher: r.publisher ?? "",

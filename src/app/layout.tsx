@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
-import { Fraunces, Geist, Geist_Mono } from "next/font/google";
+import { Bricolage_Grotesque, Geist, Geist_Mono } from "next/font/google";
 import { AppNav, AppNavFallback } from "@/components/app-nav";
 import { AssistantLauncher } from "@/components/assistant";
 import { THEME_SCRIPT } from "@/components/theme";
@@ -10,7 +10,7 @@ import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
-const display = Fraunces({ variable: "--font-display", subsets: ["latin"], weight: ["500", "600"] });
+const display = Bricolage_Grotesque({ variable: "--font-display", subsets: ["latin"], weight: ["500", "600", "700", "800"] });
 
 export const metadata: Metadata = {
   title: "Meera's Money · Fund intelligence",

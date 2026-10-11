@@ -31,7 +31,7 @@ export function optionalEnv(key: string, fallback = ""): string {
 export function integrationStatus() {
   const has = (...keys: string[]) => keys.every((k) => Boolean(process.env[k]?.trim()));
   return {
-    database: has("APPWRITE_ENDPOINT", "APPWRITE_PROJECT_ID", "APPWRITE_API_KEY", "APPWRITE_DATABASE_ID"),
+    database: has("DATABASE_URL"),
     gemini: has("GEMINI_API_KEY"),
     news: has("TAVILY_API_KEY") || has("GNEWS_API_KEY"),
     email: has("RESEND_API_KEY", "REPORT_EMAIL_FROM", "REPORT_EMAIL_TO"),

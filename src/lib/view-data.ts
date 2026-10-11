@@ -2,6 +2,7 @@ import { connection } from "next/server";
 import { INDICES, VIEWS, type IndexId, type ViewId } from "@/lib/catalog";
 import { addDays, todayIn } from "@/lib/dates";
 import { isAdmin } from "@/lib/auth";
+import * as cached from "@/lib/db/cached";
 import * as repo from "@/lib/db/repo";
 import * as research from "@/lib/db/research";
 import { weeklyHighlights } from "@/lib/highlights";
@@ -10,7 +11,7 @@ import { fetchSchemeHistory } from "@/lib/sources/mfapi";
 import { summarisePortfolio } from "@/lib/portfolio";
 import { integrationStatus, REPORT_TZ } from "@/lib/env";
 import { syncEmailStatuses } from "@/lib/delivery/deliver";
-import { buildFundPerformance, buildIndexPerformance, buildIndexSet, getIndexSeries, historyStart, type FundPerformance, type StoredPeerStats } from "@/lib/pipeline/data";
+import { historyStart, type FundPerformance, type StoredPeerStats } from "@/lib/pipeline/data";
 import type { ReportPayload, StoredWeeklyReport } from "@/lib/report/build";
 import type { ReportInput } from "@/lib/report/types";
 import type { IndexSnapshot } from "@/lib/sources/nse";
@@ -21,39 +22,46 @@ import type { IndexSnapshot } from "@/lib/sources/nse";
 export async function loadDashboard() {
   await connection();
   const asOf = todayIn(REPORT_TZ());
-  const [funds, admin] = await Promise.all([repo.listFunds({ activeOnly: true }), isAdmin()]);
+  const [funds, admin] = await Promise.all([cached.funds(), isAdmin()]);
   const [performance, headline, fx, snapshot, latestReportMeta, runs, recentNews, holdings] = await Promise.all([
-    Promise.all(funds.map((f) => buildFundPerformance(f, asOf))),
-    Promise.all((["NIFTY50", "NIFTY_MIDCAP150", "NIFTY_SMALLCAP100"] as IndexId[]).map((id) => buildIndexPerformance(id, asOf))),
-    buildIndexSet(["NASDAQ100", "USDINR"], asOf).then((s) => s.find((i) => i.id === "USDINR") ?? null),
-    repo.getLatestMarketSnapshot<IndexSnapshot[]>(),
-    repo.listReports(1),
+    Promise.all(funds.map((f) => cached.fundPerformance(f, asOf))),
+    Promise.all((["NIFTY50", "NIFTY_MIDCAP150", "NIFTY_SMALLCAP100"] as IndexId[]).map((id) => cached.indexPerformance(id, asOf))),
+    cached.indexSet(["NASDAQ100", "USDINR"], asOf).then((s) => s.find((i) => i.id === "USDINR") ?? null),
+    cached.latestMarketSnapshot<IndexSnapshot[]>(),
+    cached.reports(1),
     repo.listRuns(5),
-    repo.listNewsSince(addDays(asOf, -7) + "T00:00:00.000Z", 200).catch(() => []),
+    cached.newsSinceDay(addDays(asOf, -7), 200).catch(() => []),
     admin ? research.listHoldings().catch(() => []) : Promise.resolve([]),
   ]);
-  const latestReport = latestReportMeta[0] ? await repo.getReport<ReportPayload, ReportInput>(latestReportMeta[0].id) : null;
+  const latestReport = latestReportMeta[0] ? await cached.report<ReportPayload, ReportInput>(latestReportMeta[0].id) : null;
   const news = latestReport ? latestReport.report.news.slice(0, 6) : [];
   const withPeer = performance.map((p, i) => ({ ...p, peerKey: funds[i].peerKey }));
   const portfolio = admin ? summarisePortfolio(holdings, withPeer) : null;
   const highlights = weeklyHighlights({ funds: performance, indices: headline, fx, news: recentNews });
   const lastRefresh = runs.find((r) => r.status !== "running" && r.finishedAt) ?? null;
-  return { asOf, admin, funds, performance, headline, snapshot, latestReport, news, runs, lastRefresh, portfolio, highlights, integrations: integrationStatus() };
+  // A few explained headlines for the home story strip, preferring news about the kinds of funds held.
+  const tracked = new Set(funds.map((f) => f.viewId).filter(Boolean) as string[]);
+  const storyNews = recentNews
+    .filter((n) => n.relevance)
+    .sort((x, y) => Number(y.views.some((v) => tracked.has(v))) - Number(x.views.some((v) => tracked.has(v))))
+    .slice(0, 3)
+    .map((n) => ({ id: n.id, title: n.title, topics: n.topics }));
+  return { asOf, admin, funds, performance, headline, snapshot, latestReport, news, runs, lastRefresh, portfolio, highlights, storyNews, integrations: integrationStatus() };
 }
 
 export async function loadFund(schemeCode: number) {
   await connection();
   const asOf = todayIn(REPORT_TZ());
-  const fund = await repo.getFund(schemeCode);
+  const fund = (await cached.funds(false)).find((f) => f.schemeCode === schemeCode) ?? null;
   if (!fund) return null;
-  const perf = await buildFundPerformance(fund, asOf);
-  const bench = fund.benchmarkId && fund.benchmarkId in INDICES ? await getIndexSeries(fund.benchmarkId as IndexId, historyStart(asOf)) : null;
-  const peer = fund.peerKey && perf.nav ? await repo.getPeerStats<StoredPeerStats>(fund.peerKey, perf.nav.date) : null;
+  const perf = await cached.fundPerformance(fund, asOf);
+  const bench = fund.benchmarkId && fund.benchmarkId in INDICES ? await cached.indexSeries(fund.benchmarkId as IndexId, historyStart(asOf)) : null;
+  const peer = fund.peerKey && perf.nav ? await cached.peerStats<StoredPeerStats>(fund.peerKey, perf.nav.date) : null;
   const [history, full, news] = await Promise.all([
-    repo.listPerformanceSnapshots<Omit<FundPerformance, "chart">>(schemeCode, 26),
+    cached.performanceSnapshots<Omit<FundPerformance, "chart">>(schemeCode, 26),
     // Full NAV history for long-term risk measures and the "All" chart period (live, not stored).
     fetchSchemeHistory(schemeCode).catch(() => null),
-    repo.listNewsSince(addDays(asOf, -30) + "T00:00:00.000Z", 300).catch(() => []),
+    cached.newsSinceDay(addDays(asOf, -30), 300).catch(() => []),
   ]);
   const longTerm = full ? computeFundMetrics(full.series, asOf) : null;
   const relevantNews = fund.viewId ? news.filter((n) => n.views.includes(fund.viewId!)).slice(0, 6) : [];
@@ -64,16 +72,16 @@ export async function loadCategory(viewId: ViewId) {
   await connection();
   const asOf = todayIn(REPORT_TZ());
   const view = VIEWS[viewId];
-  const funds = (await repo.listFunds({ activeOnly: true })).filter((f) => f.viewId === viewId);
+  const funds = (await cached.funds()).filter((f) => f.viewId === viewId);
   const [performance, indices, snapshot, latestMeta] = await Promise.all([
-    Promise.all(funds.map((f) => buildFundPerformance(f, asOf))),
-    buildIndexSet(view.marketIndices, asOf),
-    repo.getLatestMarketSnapshot<IndexSnapshot[]>(),
-    repo.listReports(1),
+    Promise.all(funds.map((f) => cached.fundPerformance(f, asOf))),
+    cached.indexSet(view.marketIndices, asOf),
+    cached.latestMarketSnapshot<IndexSnapshot[]>(),
+    cached.reports(1),
   ]);
   const peerKeys = [...new Set(funds.map((f) => f.peerKey).filter(Boolean) as string[])];
-  const peers = (await Promise.all(peerKeys.map((k) => repo.getLatestPeerStats<StoredPeerStats>(k)))).filter(Boolean).map((p) => p!.stats);
-  const report = latestMeta[0] ? await repo.getReport<ReportPayload, ReportInput>(latestMeta[0].id) : null;
+  const peers = (await Promise.all(peerKeys.map((k) => cached.latestPeerStats<StoredPeerStats>(k)))).filter(Boolean).map((p) => p!.stats);
+  const report = latestMeta[0] ? await cached.report<ReportPayload, ReportInput>(latestMeta[0].id) : null;
   const summary = report?.report.output.categories.find((c) => c.viewId === viewId) ?? null;
   const news = report ? report.report.news.filter((n) => n.views.includes(viewId)) : [];
   return { asOf, view, performance, indices, snapshot, peers, report, summary, news };
@@ -81,7 +89,7 @@ export async function loadCategory(viewId: ViewId) {
 
 export async function loadReport(id: string): Promise<{ report: StoredWeeklyReport; deliveries: repo.DeliveryLog[] } | null> {
   await connection();
-  const report = await repo.getReport<ReportPayload, ReportInput>(id);
+  const report = await cached.report<ReportPayload, ReportInput>(id);
   if (!report) return null;
   let deliveries = await repo.listDeliveries(id);
   // Ask Resend for confirmed status only when an email is still "accepted, not confirmed".
@@ -93,7 +101,7 @@ export async function loadReport(id: string): Promise<{ report: StoredWeeklyRepo
 
 export async function loadArchive() {
   await connection();
-  return repo.listReports(52);
+  return cached.reports(52);
 }
 
 export async function loadManage() {
@@ -105,8 +113,8 @@ export async function loadManage() {
 export async function loadPortfolio() {
   await connection();
   const asOf = todayIn(REPORT_TZ());
-  const [funds, admin] = await Promise.all([repo.listFunds({ activeOnly: true }), isAdmin()]);
-  const performance = await Promise.all(funds.map((f) => buildFundPerformance(f, asOf)));
+  const [funds, admin] = await Promise.all([cached.funds(), isAdmin()]);
+  const performance = await Promise.all(funds.map((f) => cached.fundPerformance(f, asOf)));
   const holdings = admin ? await research.listHoldings().catch(() => []) : [];
   const withPeer = performance.map((p, i) => ({ ...p, peerKey: funds[i].peerKey }));
   const portfolio = admin ? summarisePortfolio(holdings, withPeer) : null;
@@ -117,11 +125,11 @@ export async function loadMarket() {
   await connection();
   const asOf = todayIn(REPORT_TZ());
   const [indices, snapshot, brief, news, funds] = await Promise.all([
-    buildIndexSet(["NIFTY50", "NIFTY_MIDCAP150", "NIFTY_SMALLCAP100", "NIFTY_SMALLCAP250", "NASDAQ100", "USDINR"], asOf),
-    repo.getLatestMarketSnapshot<IndexSnapshot[]>(),
-    research.getLatestMarketBrief<{ brief: import("@/lib/news/brief").MarketBrief; input: import("@/lib/news/brief").BriefInput }>().catch(() => null),
-    repo.listNewsSince(addDays(asOf, -30) + "T00:00:00.000Z", 600).catch(() => []),
-    repo.listFunds({ activeOnly: true }),
+    cached.indexSet(["NIFTY50", "NIFTY_MIDCAP150", "NIFTY_SMALLCAP100", "NIFTY_SMALLCAP250", "NASDAQ100", "USDINR"], asOf),
+    cached.latestMarketSnapshot<IndexSnapshot[]>(),
+    cached.latestMarketBrief<{ brief: import("@/lib/news/brief").MarketBrief; input: import("@/lib/news/brief").BriefInput }>().catch(() => null),
+    cached.newsSinceDay(addDays(asOf, -30), 600).catch(() => []),
+    cached.funds(),
   ]);
   const trackedViews = [...new Set(funds.map((f) => f.viewId).filter(Boolean) as string[])];
   return { asOf, indices, snapshot, brief, news, trackedViews };
@@ -131,8 +139,8 @@ export async function loadExplore() {
   await connection();
   const admin = await isAdmin();
   const [metrics, groups, prefs, watch] = await Promise.all([
-    research.listFundMetrics<import("@/lib/pipeline/discovery").DiscoveryFundData>(),
-    research.listDiscoveryGroups<import("@/lib/pipeline/discovery").DiscoveryGroupData>(),
+    cached.fundMetrics<import("@/lib/pipeline/discovery").DiscoveryFundData>(),
+    cached.discoveryGroups<import("@/lib/pipeline/discovery").DiscoveryGroupData>(),
     admin ? research.getPreferences().catch(() => null) : Promise.resolve(null),
     admin ? research.listWatchlist().catch(() => []) : Promise.resolve([]),
   ]);

@@ -3,14 +3,13 @@ import { generateJson } from "@/lib/ai/gemini";
 import { VIEWS, type ViewId } from "@/lib/catalog";
 import { round } from "@/lib/calc/returns";
 import { addDays, todayIn } from "@/lib/dates";
-import * as repo from "@/lib/db/repo";
+import * as cached from "@/lib/db/cached";
 import * as research from "@/lib/db/research";
 import { REPORT_TZ } from "@/lib/env";
 import { shortlist, toUniverseRow, groupLabelMap } from "@/lib/explore";
 import { GLOSSARY } from "@/lib/glossary";
 import { errorMessage } from "@/lib/log";
 import type { MarketBrief } from "@/lib/news/brief";
-import { buildFundPerformance, buildIndexPerformance } from "@/lib/pipeline/data";
 import type { DiscoveryFundData, DiscoveryGroupData } from "@/lib/pipeline/discovery";
 import { summarisePortfolio } from "@/lib/portfolio";
 import type { ReportPayload } from "@/lib/report/build";
@@ -44,17 +43,17 @@ const short = (n: string) => n.replace(/\s*-\s*Direct Plan.*$/i, "").replace(/\s
 
 export async function buildAssistantContext(admin: boolean) {
   const asOf = todayIn(REPORT_TZ());
-  const funds = await repo.listFunds({ activeOnly: true });
+  const funds = await cached.funds();
   const [perf, indices, latestMeta, brief, news, metrics, groups] = await Promise.all([
-    Promise.all(funds.map((f) => buildFundPerformance(f, asOf))),
-    Promise.all((["NIFTY50", "NIFTY_MIDCAP150", "NIFTY_SMALLCAP100"] as const).map((id) => buildIndexPerformance(id, asOf))),
-    repo.listReports(1),
-    research.getLatestMarketBrief<{ brief: MarketBrief }>().catch(() => null),
-    repo.listNewsSince(addDays(asOf, -7) + "T00:00:00.000Z", 60).catch(() => []),
-    research.listFundMetrics<DiscoveryFundData>().catch(() => []),
-    research.listDiscoveryGroups<DiscoveryGroupData>().catch(() => []),
+    Promise.all(funds.map((f) => cached.fundPerformance(f, asOf))),
+    Promise.all((["NIFTY50", "NIFTY_MIDCAP150", "NIFTY_SMALLCAP100"] as const).map((id) => cached.indexPerformance(id, asOf))),
+    cached.reports(1),
+    cached.latestMarketBrief<{ brief: MarketBrief }>().catch(() => null),
+    cached.newsSinceDay(addDays(asOf, -7), 200).then((n) => n.slice(0, 60)).catch(() => []),
+    cached.fundMetrics<DiscoveryFundData>().catch(() => []),
+    cached.discoveryGroups<DiscoveryGroupData>().catch(() => []),
   ]);
-  const report = latestMeta[0] ? await repo.getReport<ReportPayload, unknown>(latestMeta[0].id) : null;
+  const report = latestMeta[0] ? await cached.report<ReportPayload, unknown>(latestMeta[0].id) : null;
   const labels = groupLabelMap(groups);
   const rows = metrics.map((m) => toUniverseRow(m, labels[m.groupKey] ?? m.groupKey)).filter((r): r is NonNullable<typeof r> => r !== null);
   const sl = shortlist(rows, admin ? await research.getPreferences().catch(() => null) : null).rows;

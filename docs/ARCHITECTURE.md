@@ -19,8 +19,13 @@
   for jobs (Hobby-plan maximum).
 - **Next.js 16 App Router** with Cache Components: pages are prerendered shells; data sections are server
   components inside `<Suspense>` that call `connection()` so they always render from the latest stored data.
-- **Appwrite Cloud TablesDB** (Frankfurt region) — accessed only from the server with an API key. Tables have no
-  client permissions.
+- **Postgres on Nhost** (Frankfurt, eu-central-1) — accessed only from the server over TLS with the
+  `DATABASE_URL` connection string (`postgres` driver, small pool). Nothing in the browser talks to the database.
+- **Cached reads** (`src/lib/db/cached.ts`): pages, the assistant and analyses read through `'use cache: remote'`
+  functions (shared across Vercel instances, about an hour, tag `db-data`). The nightly/weekly jobs and every
+  owner action call `invalidateData()` after writing. Jobs themselves read the database directly so they always
+  see what they just wrote. This keeps database reads proportional to data changes, not to page views — the
+  original Appwrite project hit its free monthly read quota because every view re-read a year of prices.
 
 ## Pipelines
 
@@ -46,9 +51,11 @@
    report + channel. Not-configured channels are logged as `awaiting_configuration`.
 6. Close the run as `succeeded`, `partial` (some step or channel failed) or `failed`.
 
-## Data model (Appwrite TablesDB)
+## Data model (Postgres)
 
-Defined in `src/lib/db/schema.ts`, created by `scripts/setup-db.ts` (additive, idempotent; `SCHEMA_VERSION = 1`).
+Defined in `src/lib/db/schema.ts`, created by `scripts/setup-db.ts` (additive, idempotent; `SCHEMA_VERSION = 3`).
+Every table has a text primary key `id`; deterministic ids (e.g. `n_<scheme>_<yyyymmdd>`) make writes idempotent,
+and `insert … on conflict (id) do nothing` is the claim used for run and delivery idempotency.
 
 | Table | Row id | Purpose |
 |---|---|---|

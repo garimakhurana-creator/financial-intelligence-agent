@@ -221,8 +221,8 @@
   }
   h1,
   .font-display {
-    font-family: var(--font-display), ui-serif, Georgia, serif;
-    letter-spacing: -0.01em;
+    font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
+    letter-spacing: -0.02em;
   }
 }
 
@@ -251,6 +251,65 @@ body {
 .lift:hover {
   transform: translateY(-1px);
   box-shadow: var(--shadow-card);
+}
+
+/* playful motion; all of it switches off for people who prefer reduced motion */
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+@keyframes float-slow {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-4deg);
+  }
+  50% {
+    transform: translateY(-10px) rotate(4deg);
+  }
+}
+@keyframes wave {
+  0%,
+  60%,
+  100% {
+    transform: rotate(0);
+  }
+  10%,
+  30% {
+    transform: rotate(14deg);
+  }
+  20%,
+  40% {
+    transform: rotate(-8deg);
+  }
+}
+.fade-up {
+  animation: fade-up 0.5s ease both;
+}
+.float-slow {
+  animation: float-slow 6s ease-in-out infinite;
+}
+.wave {
+  transform-origin: 70% 70%;
+  animation: wave 2.4s ease-in-out 0.6s 2;
+}
+.story-card:hover {
+  transform: translateY(-3px) rotate(-0.6deg);
+}
+@media (prefers-reduced-motion: reduce) {
+  .fade-up,
+  .float-slow,
+  .wave {
+    animation: none;
+  }
+  .story-card:hover {
+    transform: none;
+  }
 }
 
 @media print {

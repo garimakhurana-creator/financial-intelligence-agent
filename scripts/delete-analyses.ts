@@ -1,9 +1,10 @@
 // Deletes saved analyses by id (test clean-up). Usage: npx tsx --env-file=.env.local scripts/delete-analyses.ts <id> [...]
-import { appwrite } from "@/lib/db/client";
+import { sql } from "@/lib/db/client";
+import { deleteAnalyses } from "@/lib/db/research";
+
 async function main() {
-  const { db, databaseId } = appwrite();
-  for (const id of process.argv.slice(2)) {
-    await db.deleteRow({ databaseId, tableId: "fund_analyses", rowId: id }).then(() => console.log("deleted", id), (e) => console.log("skip", id, e.message));
-  }
+  const removed = await deleteAnalyses(process.argv.slice(2));
+  console.log(`deleted ${removed}`);
+  await sql().end();
 }
-main().then(() => process.exit(0));
+main();

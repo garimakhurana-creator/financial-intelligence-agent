@@ -1,4 +1,5 @@
 import { todayIn } from "@/lib/dates";
+import { invalidateData } from "@/lib/db/cached";
 import * as repo from "@/lib/db/repo";
 import { REPORT_TZ } from "@/lib/env";
 import { errorMessage, log } from "@/lib/log";
@@ -55,6 +56,7 @@ export async function runDaily(trigger: "cron" | "manual", opts: { force?: boole
   const failed = steps.filter((s) => !s.ok).length;
   const status: repo.RunStatus = failed === steps.length ? "failed" : failed || partial ? "partial" : "succeeded";
   await repo.finishRun(claim.run.id, status, steps);
+  invalidateData();
   return { status, steps, runId: claim.run.id };
 }
 
@@ -115,5 +117,6 @@ export async function runWeekly(trigger: "cron" | "manual", opts: { force?: bool
 
   const status: repo.RunStatus = steps.some((s) => !s.ok) || partial ? "partial" : "succeeded";
   await repo.finishRun(claim.run.id, status, steps);
+  invalidateData();
   return { status, steps, runId: claim.run.id, reportId: (report as { id: string } | null)?.id };
 }

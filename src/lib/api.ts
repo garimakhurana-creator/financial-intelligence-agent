@@ -1,4 +1,5 @@
 import { clientIp, isAdmin, rateLimit } from "@/lib/auth";
+import { invalidateData } from "@/lib/db/cached";
 import { MissingConfigError } from "@/lib/env";
 import { errorMessage, log } from "@/lib/log";
 import { FundInputError } from "@/lib/pipeline/funds";
@@ -18,7 +19,10 @@ export function adminRoute<A extends unknown[]>(handler: (...args: A) => Promise
     if (req && !rateLimit(`${limit.name}:${clientIp(req)}`, limit.max, limit.windowMs)) {
       return json({ error: "Too many requests — please wait a little and try again." }, 429);
     }
-    return handle(() => handler(...args));
+    const res = await handle(() => handler(...args));
+    // Owner actions write data (funds, holdings, reports, deliveries), so cached page reads go stale.
+    if (req && req.method !== "GET" && res.ok) invalidateData();
+    return res;
   };
 }
 

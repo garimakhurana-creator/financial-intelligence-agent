@@ -14,7 +14,7 @@ How the pieces fit together, mapped to the files that implement them. Arrows sho
                (refreshFundNav)         (fallback order, INR series)  date window)
                                 │                       │                      │
                                 ▼                       ▼                      ▼
-        ┌──────────────────────────── APPWRITE TABLESDB (db/schema.ts, db/repo.ts) ─────────────────────────┐
+        ┌──────────────────────────── POSTGRES / NHOST (db/schema.ts, db/repo.ts) ────────────────────────────┐
         │ tracked_funds · nav_history · index_history · market_snapshots · peer_stats ·                      │
         │ performance_snapshots · market_news · weekly_reports (+input snapshot) · delivery_logs · scheduled_runs │
         └───────────┬──────────────────────────┬────────────────────────────────────────────────────┬───────┘
@@ -58,7 +58,7 @@ How the pieces fit together, mapped to the files that implement them. Arrows sho
 | 4 | News & macro | 2–3 queries per category view, last 7 days, dedupe by URL/headline, credibility ranking | `src/lib/sources/news.ts` | Tavily, GNews |
 | 5 | Calculations | Point-to-point returns, holiday snapping, staleness, excess returns | `src/lib/calc/returns.ts`, `src/lib/dates.ts` | — |
 | 6 | AI narrative | Gemini Flash structured output, validator, retry with feedback, fallback | `src/lib/report/*` | Gemini API |
-| 7 | Persistence | Appwrite TablesDB schema + repository; idempotent setup script | `src/lib/db/*`, `scripts/setup-db.ts` | Appwrite Cloud (Frankfurt) |
+| 7 | Persistence | Postgres schema + repository + cached reads; idempotent setup script | `src/lib/db/*`, `scripts/setup-db.ts` | Nhost Postgres (Frankfurt) |
 | 8 | Delivery | Email (Resend), Telegram, WhatsApp; per-channel logs; status sync/webhook | `src/lib/delivery/*`, `src/app/api/webhooks/whatsapp` | Resend, Telegram, Meta |
 | 9 | Scheduling | Daily + Saturday jobs, run history, duplicate protection | `src/lib/jobs.ts`, `src/app/api/cron/*`, `vercel.json` | Vercel Cron |
 | 10 | Fund management | Lookup → confirm → add; soft remove; editable mapping | `src/lib/pipeline/funds.ts`, `src/app/api/funds/*`, `src/components/manage-panel.tsx` | MFapi.in |

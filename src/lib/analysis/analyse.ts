@@ -4,6 +4,7 @@ import { discoveryGroup, suggestPeerRule } from "@/lib/catalog";
 import { computeFundMetrics, consistencyVsCategory, HORIZONS, type FundMetrics, type Horizon } from "@/lib/calc/metrics";
 import { round } from "@/lib/calc/returns";
 import { addDays, minusMonths, todayIn, type ISODate } from "@/lib/dates";
+import * as cached from "@/lib/db/cached";
 import * as research from "@/lib/db/research";
 import { REPORT_TZ } from "@/lib/env";
 import { mapLimit } from "@/lib/http";
@@ -137,7 +138,7 @@ export async function buildFacts(input: { schemeCode: number | null; document: D
     const g = rule ? discoveryGroup(rule.key) : undefined;
     if (rule && g) {
       group = { key: g.key, label: rule.label, plain: g.plain, horizon: g.horizon, riskBand: g.riskBand };
-      const stored = (await research.listDiscoveryGroups<DiscoveryGroupData>()).find((x) => x.groupKey === g.key);
+      const stored = (await cached.discoveryGroups<DiscoveryGroupData>()).find((x) => x.groupKey === g.key);
       if (stored) {
         category = { medians: stored.data.medians, reference: stored.data.reference, computedAt: stored.computedAt, peers: stored.data.fetched };
         sources.push(`Category medians: ${stored.data.fetched} Direct-Growth ${rule.label.toLowerCase()} (computed ${stored.computedAt.slice(0, 10)})`);
@@ -154,7 +155,7 @@ export async function buildFacts(input: { schemeCode: number | null; document: D
       } catch (e) {
         sources.push(`Consistency not computed: ${errorMessage(e)}`);
       }
-      const alts = (await research.listFundMetrics<DiscoveryFundData>(g.key))
+      const alts = (await cached.fundMetrics<DiscoveryFundData>(g.key))
         .filter((a) => a.schemeCode !== input.schemeCode && a.score !== null)
         .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
         .slice(0, 3);

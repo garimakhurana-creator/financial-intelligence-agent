@@ -55,13 +55,16 @@ all — rates, yields, inflation, RBI. International: splits the rupee return in
 dollar-rupee move.
 
 **11. How is history stored?**
-Appwrite TablesDB: daily NAV and index rows (one per day, unique keys), peer stats with every constituent's
+Postgres (on Nhost): daily NAV and index rows (one per day, unique keys), peer stats with every constituent's
 returns, a performance snapshot per fund per report, and every report with its full input snapshot so it can be
 reproduced. Removing a fund only deactivates it.
 
-**12. Why Appwrite when the brief says Supabase?**
-It was my choice; the requirement is persistent weekly snapshots for trend tracking, which this meets. The data
-layer is isolated in `src/lib/db/`, so switching databases only touches that folder.
+**12. Why Nhost Postgres when the brief says Supabase?**
+The requirement is persistent weekly snapshots for trend tracking, which any Postgres meets. I started on Appwrite;
+its free plan has a monthly read quota, and because every page view re-read a year of prices the quota ran out and
+the site stopped loading. I fixed the cause (shared caching, so reads follow data changes rather than page views)
+and moved to Postgres on Nhost, which has no per-read quota. Because the data layer is isolated in `src/lib/db/`,
+only that folder and the setup script changed.
 
 **13. How does Saturday morning work?**
 Vercel Cron calls `/api/cron/weekly` between 08:00 and 08:59 IST with a secret. It claims a run keyed by the
@@ -94,7 +97,7 @@ Peer averages are per category and date, so they're shared across funds and woul
 users means a user id on funds, reports and deliveries. Longer jobs could be split per step or queued.
 
 **19. What's live, cached, simulated, blocked?**
-Live: NAVs, indices, breadth, news, Gemini, Appwrite, email. Stored/cached: everything is read from the database
+Live: NAVs, indices, breadth, news, Gemini, Postgres, email. Stored/cached: everything is read from the database
 between refreshes, with freshness badges. Simulated: nothing. Blocked: WhatsApp until Meta template approval;
 Telegram until the bot token is added; email can only go to the Resend account owner until a domain is verified.
 

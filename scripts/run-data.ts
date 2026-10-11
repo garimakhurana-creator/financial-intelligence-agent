@@ -1,4 +1,4 @@
-// Seeds the default funds (if empty), ingests NAVs/indices/peers into Appwrite and prints the
+// Seeds the default funds (if empty), ingests NAVs/indices/peers into the database and prints the
 // resulting performance table. Usage: npx tsx --env-file=.env.local scripts/run-data.ts
 import { round, WINDOWS } from "@/lib/calc/returns";
 import { todayIn } from "@/lib/dates";
