@@ -8,8 +8,12 @@ export const MAX_SENTENCE_WORDS = 50;
 export const JARGON_RE = /\b(benchmarks?|peers?|peer group|underperform\w*|outperform\w*|YTD|basis points|allocation|volatility)\b/i;
 export const MAX_REASON_WORDS = 45;
 
-/** Phrases that would turn a monitoring report into a trade instruction. */
-export const ADVICE_RE = /\b(buy|sell|redeem|exit (?:the|this) fund|switch (?:out|to)|book profits?|stop (?:your|the) sip|increase (?:your|the) sip|invest more|guarantee[ds]?)\b/i;
+/**
+ * Phrases that would turn a monitoring report into a trade instruction. "guarantee" is only
+ * blocked when asserted; disclaimers such as "past returns do not guarantee…" are allowed.
+ */
+export const ADVICE_RE =
+  /\b(buy|sell|redeem|exit (?:the|this) fund|switch (?:out|to)|book profits?|stop (?:your|the) sip|increase (?:your|the) sip|invest more)\b|(?<!\b(?:not|no|never|cannot|can't|don't|doesn't|isn't|aren't)\s(?:be\s)?)\bguarantee[ds]?\b/i;
 
 /**
  * Count sentences. Decimal points ("0.43%") and common abbreviations are protected so they do not

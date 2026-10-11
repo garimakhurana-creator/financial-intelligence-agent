@@ -189,3 +189,14 @@ describe("plain-language headline", () => {
     }
   });
 });
+
+describe("advice guard", () => {
+  it("blocks instructions and asserted guarantees but allows disclaimers", async () => {
+    const { ADVICE_RE } = await import("@/lib/report/validate");
+    expect(ADVICE_RE.test("You should sell this fund.")).toBe(true);
+    expect(ADVICE_RE.test("Returns are guaranteed.")).toBe(true);
+    expect(ADVICE_RE.test("Past returns do not guarantee future returns.")).toBe(false);
+    expect(ADVICE_RE.test("Returns are not guaranteed.")).toBe(false);
+    expect(ADVICE_RE.test("Domestic institutional buying offset foreign selling.")).toBe(false);
+  });
+});
