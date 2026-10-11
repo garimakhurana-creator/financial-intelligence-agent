@@ -61,7 +61,8 @@ export function templateText(s: string, max = 900): string {
 /**
  * Sends the approved template. Template body (configured in WhatsApp Manager):
  *   Hi {{1}}, your weekly mutual fund report for the week ending {{2}} is ready.
- *   Overall: {{3}}. Read it here: {{4}}
+ *   Overall: {{3}}. Read the full report here: {{4}} (monitoring summary, not investment advice).
+ * Meta does not allow a template body to end with a variable, hence the closing phrase.
  * Business-initiated messages outside a 24-hour customer-service window must use an approved
  * template — free-form text would be rejected by Meta.
  */

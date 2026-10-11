@@ -43,7 +43,7 @@ npx tsx --env-file=.env.local scripts/smoke-sources.ts   # live check of every d
 | Gemini structured output | local and **production** report generation | `gemini-3.8-flash`, valid on attempt 1 (prod: 79 s incl. data refresh) |
 | Email (Resend) | local + production test sends; `scripts/email-status.ts` | Accepted, then Resend `last_event: delivered`; report page shows "Delivered (confirmed by provider)" |
 | Telegram | `scripts/send-test.ts telegram` and production test send (bot @Mutualfund_friend_bot) | Accepted by Telegram API (message ids recorded); bots receive no delivery receipts |
-| WhatsApp | pending Meta setup | not verified — code path reports `awaiting_configuration` |
+| WhatsApp (Cloud API) | Meta test number +1 555-630-7891, permanent system-user token; `hello_world` template sent to the owner's number | Accepted by Meta (`message_status: accepted`, wamid recorded); custom `weekly_fund_report` template submitted for review |
 | Cron auth + idempotency | production `curl` without/with secret, twice | 401 without secret; second call `skipped: already completed` |
 | Admin API | local `curl` | unauth → 401; wrong password → 401; invalid/nonexistent/duplicate codes rejected; add → NAV backfilled; remove → soft; remove again → error; past reports intact |
 

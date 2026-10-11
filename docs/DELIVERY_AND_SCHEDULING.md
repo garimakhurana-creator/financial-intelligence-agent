@@ -65,7 +65,7 @@ Test sends (report page → owner only, or `scripts/send-test.ts`) get a fresh `
 Implemented (`sendWhatsApp`, `/api/webhooks/whatsapp`) and reporting `awaiting_configuration` until set up.
 
 - Business-initiated messages outside a 24-hour customer-service window must use an **approved template**. Body:
-  `Hi {{1}}, your weekly mutual fund report for the week ending {{2}} is ready. Overall: {{3}}. Read it here: {{4}}`
+  `Hi {{1}}, your weekly mutual fund report for the week ending {{2}} is ready. Overall: {{3}}. Read the full report here: {{4}} (monitoring summary, not investment advice).`
   ({{3}} = label + reason). Parameters are cleaned of newlines/tabs as required by the API.
 - No automatic retries on WhatsApp sends (a timeout after Meta accepted would duplicate the message); retry is an
   explicit owner action.
