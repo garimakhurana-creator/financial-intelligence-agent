@@ -5,6 +5,8 @@ import { isAdmin } from "@/lib/auth";
 import * as repo from "@/lib/db/repo";
 import * as research from "@/lib/db/research";
 import { weeklyHighlights } from "@/lib/highlights";
+import { computeFundMetrics } from "@/lib/calc/metrics";
+import { fetchSchemeHistory } from "@/lib/sources/mfapi";
 import { summarisePortfolio } from "@/lib/portfolio";
 import { integrationStatus, REPORT_TZ } from "@/lib/env";
 import { syncEmailStatuses } from "@/lib/delivery/deliver";
@@ -47,8 +49,15 @@ export async function loadFund(schemeCode: number) {
   const perf = await buildFundPerformance(fund, asOf);
   const bench = fund.benchmarkId && fund.benchmarkId in INDICES ? await getIndexSeries(fund.benchmarkId as IndexId, historyStart(asOf)) : null;
   const peer = fund.peerKey && perf.nav ? await repo.getPeerStats<StoredPeerStats>(fund.peerKey, perf.nav.date) : null;
-  const history = await repo.listPerformanceSnapshots<Omit<FundPerformance, "chart">>(schemeCode, 26);
-  return { asOf, fund, perf, benchSeries: bench?.series ?? [], peer: peer?.stats ?? null, history };
+  const [history, full, news] = await Promise.all([
+    repo.listPerformanceSnapshots<Omit<FundPerformance, "chart">>(schemeCode, 26),
+    // Full NAV history for long-term risk measures and the "All" chart period (live, not stored).
+    fetchSchemeHistory(schemeCode).catch(() => null),
+    repo.listNewsSince(addDays(asOf, -30) + "T00:00:00.000Z", 300).catch(() => []),
+  ]);
+  const longTerm = full ? computeFundMetrics(full.series, asOf) : null;
+  const relevantNews = fund.viewId ? news.filter((n) => n.views.includes(fund.viewId!)).slice(0, 6) : [];
+  return { asOf, fund, perf, benchSeries: bench?.series ?? [], peer: peer?.stats ?? null, history, fullSeries: full?.series ?? perf.chart, longTerm, relevantNews };
 }
 
 export async function loadCategory(viewId: ViewId) {

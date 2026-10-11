@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { AssessmentBanner, NewsList, SectionTitle, WINDOW_LABEL } from "@/components/blocks";
 import { DateText, Pct, Pp, shortFundName, Timestamp } from "@/components/format";
+import { PrintButton } from "@/components/print-button";
 import { SendControls } from "@/components/send-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -59,9 +60,18 @@ async function Report({ params }: { params: PageProps<"/reports/[id]">["params"]
   return (
     <div className="space-y-8">
       <div>
-        <Link href="/reports" className="text-sm text-muted-foreground hover:underline">
-          ← All reports
-        </Link>
+        <div className="flex flex-wrap items-center justify-between gap-2 print:hidden">
+          <nav aria-label="Breadcrumb" className="flex gap-1 text-xs text-muted-foreground">
+            <Link href="/" className="hover:underline">
+              Dashboard
+            </Link>
+            <span aria-hidden>›</span>
+            <Link href="/reports" className="hover:underline">
+              Weekly Reports
+            </Link>
+          </nav>
+          <PrintButton />
+        </div>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">Weekly report · week ending <DateText date={report.weekEnding} /></h1>
         <p className="mt-1 text-xs text-muted-foreground">
           {report.kind === "scheduled" ? "Saturday scheduled run" : "Generated on demand"} · generated <Timestamp iso={report.createdAt} /> ·{" "}
@@ -108,7 +118,11 @@ async function Report({ params }: { params: PageProps<"/reports/[id]">["params"]
                   </li>
                 </ol>
                 {perf && (
-                  <div className="mt-3 overflow-x-auto">
+                  <details className="group mt-3">
+                  <summary className="cursor-pointer list-none text-xs font-medium text-[var(--ink-secondary)] underline decoration-dotted underline-offset-4 [&::-webkit-details-marker]:hidden">
+                    Show the numbers behind this
+                  </summary>
+                  <div className="mt-2 overflow-x-auto">
                     <Table className="text-xs">
                       <TableHeader>
                         <TableRow>
@@ -149,6 +163,7 @@ async function Report({ params }: { params: PageProps<"/reports/[id]">["params"]
                       </TableBody>
                     </Table>
                   </div>
+                  </details>
                 )}
               </article>
             );
@@ -190,8 +205,12 @@ async function Report({ params }: { params: PageProps<"/reports/[id]">["params"]
       </section>
 
       <section>
-        <SectionTitle sub="Evidence ids (N1, N2…) above link to these articles.">Sources</SectionTitle>
-        <NewsList items={p.news} showViews />
+        <details className="group" open={p.news.length <= 8}>
+          <summary className="cursor-pointer list-none [&::-webkit-details-marker]:hidden">
+            <SectionTitle sub={`${p.news.length} articles. Evidence ids (N1, N2…) above link to these. Click to show or hide.`}>Sources</SectionTitle>
+          </summary>
+          <NewsList items={p.news} showViews />
+        </details>
       </section>
 
       <section className="grid gap-6 lg:grid-cols-2">

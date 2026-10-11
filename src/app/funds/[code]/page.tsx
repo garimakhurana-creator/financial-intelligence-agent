@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
-import { SectionTitle, WINDOW_LABEL } from "@/components/blocks";
-import { IndexedLineChart, WindowBars } from "@/components/charts";
+import { NewsList, SectionTitle, WINDOW_LABEL } from "@/components/blocks";
+import { WindowBars } from "@/components/charts";
+import { PerformanceChart } from "@/components/performance-chart";
+import { Explain } from "@/components/page-header";
+import { metricTriples } from "@/lib/report/input";
+import { screenFund } from "@/lib/report/screening";
 import { DateText, Freshness, Inr, Pct, Pp, shortFundName, Timestamp } from "@/components/format";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -38,10 +42,16 @@ async function FundDetail({ params }: { params: PageProps<"/funds/[code]">["para
   return (
     <div className="space-y-8">
       <div>
-        <Link href="/" className="text-sm text-muted-foreground hover:underline">
-          ← Dashboard
-        </Link>
-        <h1 className="mt-2 text-2xl font-semibold tracking-tight">{shortFundName(perf.schemeName)}</h1>
+        <nav aria-label="Breadcrumb" className="mb-2 flex gap-1 text-xs text-muted-foreground">
+          <Link href="/" className="hover:underline">
+            Dashboard
+          </Link>
+          <span aria-hidden>›</span>
+          <Link href="/portfolio" className="hover:underline">
+            My Portfolio
+          </Link>
+        </nav>
+        <h1 className="text-2xl font-semibold tracking-tight">{shortFundName(perf.schemeName)}</h1>
         <p className="mt-1 text-sm text-[var(--ink-secondary)]">
           {perf.fundHouse} · {perf.amfiCategory} · scheme code {perf.schemeCode}
           {perf.viewId && (
@@ -60,6 +70,14 @@ async function FundDetail({ params }: { params: PageProps<"/funds/[code]">["para
           </div>
           <Freshness date={perf.nav?.date} today={d.asOf} label="NAV" />
         </div>
+        {(() => {
+          const m = perf.windows["1M"];
+          if (m.fund.returnPct === null) return null;
+          const parts = [`Over the past month this fund returned ${m.fund.returnPct.toFixed(2)}%`];
+          if (m.benchmark?.returnPct != null) parts.push(`compared with ${m.benchmark.returnPct.toFixed(2)}% for ${perf.benchmark?.name}`);
+          if (m.peer?.mean != null) parts.push(`and ${m.peer.mean.toFixed(2)}% for the average of ${m.peer.n} similar funds`);
+          return <p className="mt-3 max-w-3xl text-[var(--ink-secondary)]">{parts.join(", ")}.</p>;
+        })()}
         {perf.flags.length > 0 && (
           <ul className="mt-3 space-y-1 text-sm">
             {perf.flags.map((f) => (
@@ -73,14 +91,14 @@ async function FundDetail({ params }: { params: PageProps<"/funds/[code]">["para
 
       <section className="grid gap-6 lg:grid-cols-2">
         <div className="rounded-xl border bg-card p-4">
-          <SectionTitle sub="Growth of ₹100 over the last year — fund versus its benchmark (price index), both rebased to 100.">NAV history</SectionTitle>
-          <IndexedLineChart
+          <SectionTitle sub="Growth of ₹100 — fund NAV versus its benchmark (price index). The benchmark is stored for about a year; untick it to see the fund's full history.">NAV and return history</SectionTitle>
+          <PerformanceChart
+            height={260}
             series={[
-              { key: "fund", name: "Fund NAV", color: "var(--series-1)", data: perf.chart },
-              ...(perf.benchmark
-                ? [{ key: "bench", name: perf.benchmark.name, color: "var(--series-2)", data: d.benchSeries.filter((o) => o.date >= (perf.chart[0]?.date ?? "")) }]
-                : []),
+              { key: "fund", name: "Fund NAV", kind: "fund", data: d.fullSeries },
+              ...(perf.benchmark ? [{ key: "bench", name: perf.benchmark.name, kind: "index" as const, data: d.benchSeries }] : []),
             ]}
+            initial={perf.benchmark ? ["fund", "bench"] : ["fund"]}
           />
         </div>
         <div className="rounded-xl border bg-card p-4">
@@ -194,6 +212,53 @@ async function FundDetail({ params }: { params: PageProps<"/funds/[code]">["para
         </div>
       </section>
 
+      <section className="grid gap-6 lg:grid-cols-2">
+        <div className="rounded-xl border bg-card p-4">
+          <SectionTitle sub="From the fund's full NAV history (MFapi). 3Y and 5Y are average yearly returns.">Long-term record and risk</SectionTitle>
+          {d.longTerm ? (
+            <dl className="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:grid-cols-3">
+              {(["1Y", "3Y", "5Y"] as const).map((h) => (
+                <div key={h}>
+                  <dt className="text-xs text-muted-foreground">{h === "1Y" ? "1 year" : h === "3Y" ? "3 years, a year" : "5 years, a year"}</dt>
+                  <dd>
+                    <Pct value={h === "1Y" ? d.longTerm!.returns[h].total : d.longTerm!.returns[h].annualised} />
+                  </dd>
+                </div>
+              ))}
+              <div>
+                <dt className="text-xs text-muted-foreground">Volatility (3 yrs, a year)</dt>
+                <dd className="tabular">{d.longTerm.volatility3Y === null ? "n/a" : `${d.longTerm.volatility3Y.toFixed(2)}%`}</dd>
+              </div>
+              <div className="col-span-2">
+                <dt className="text-xs text-muted-foreground">Worst fall (3 yrs)</dt>
+                <dd className="tabular">
+                  {d.longTerm.maxDrawdown3Y ? `${d.longTerm.maxDrawdown3Y.pct.toFixed(2)}% (${d.longTerm.maxDrawdown3Y.peak} → ${d.longTerm.maxDrawdown3Y.trough})` : "n/a"}
+                </dd>
+              </div>
+            </dl>
+          ) : (
+            <p className="text-sm text-muted-foreground">Full history could not be fetched right now.</p>
+          )}
+          <div className="mt-3">
+            <Explain label="What do volatility and worst fall mean?">
+              Volatility measures how much the fund&apos;s value swings week to week, scaled to a year — higher means a bumpier ride. The worst fall is the biggest drop from a
+              high point to a later low point; it shows what holding through a bad patch felt like. Neither predicts the future.
+            </Explain>
+          </div>
+        </div>
+        <div className="rounded-xl border bg-card p-4">
+          <SectionTitle sub="Recent articles tagged to this fund's category (last 30 days).">Relevant news</SectionTitle>
+          {d.relevantNews.length ? (
+            <NewsList items={d.relevantNews} />
+          ) : (
+            <p className="text-sm text-muted-foreground">No recent articles for this category.</p>
+          )}
+          <Link href="/market" className="mt-2 inline-block text-sm font-medium underline">
+            All market news
+          </Link>
+        </div>
+      </section>
+
       {d.history.length > 1 && (
         <section>
           <SectionTitle sub="Stored each time a report is generated, so trends can be followed week by week.">Weekly snapshot history</SectionTitle>
@@ -206,6 +271,7 @@ async function FundDetail({ params }: { params: PageProps<"/funds/[code]">["para
                   <TableHead className="text-right">vs benchmark</TableHead>
                   <TableHead className="text-right">vs peers</TableHead>
                   <TableHead className="text-right">YTD</TableHead>
+                  <TableHead>Weekly check</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -225,6 +291,12 @@ async function FundDetail({ params }: { params: PageProps<"/funds/[code]">["para
                     </TableCell>
                     <TableCell className="text-right">
                       <Pct value={h.data.windows["YTD"].fund.returnPct} />
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {(() => {
+                        const s = screenFund(h.data.viewId, metricTriples(h.data));
+                        return s.flag ? <span className="rounded-full bg-[var(--tint-warning)] px-2 py-0.5">Worth monitoring</span> : <span className="text-muted-foreground">On track</span>;
+                      })()}
                     </TableCell>
                   </TableRow>
                 ))}

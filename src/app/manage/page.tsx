@@ -12,8 +12,10 @@ export default function ManagePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Manage</h1>
-        <p className="mt-1 text-sm text-[var(--ink-secondary)]">Add or remove funds by scheme code, generate a report on demand, and send test messages — no code changes needed.</p>
+        <h1 className="text-2xl font-semibold tracking-tight">Settings &amp; funds</h1>
+        <p className="mt-1 text-sm text-[var(--ink-secondary)]">
+          Owner sign-in, tracked funds and their benchmark/peer mapping, on-demand reports and data refreshes, integration status and run history. Holdings and SIPs are on My Portfolio.
+        </p>
       </div>
       <Suspense fallback={<Skeleton className="h-96 w-full rounded-xl" />}>
         <Manage />
