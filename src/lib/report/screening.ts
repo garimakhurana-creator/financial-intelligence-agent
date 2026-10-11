@@ -100,7 +100,7 @@ function notesText(n: PortfolioNotes): string {
   }
   if (n.yearLag.length) {
     parts.push(
-      `${list(n.yearLag.map((l) => short(l.name)))} ${n.yearLag.length === 1 ? "is" : "are"} still behind similar funds this year (by ${list(n.yearLag.map((l) => Math.abs(l.vsPeers).toFixed(2)))} points).`,
+      `${list(n.yearLag.map((l) => short(l.name)))} ${n.yearLag.length === 1 ? "is" : "are"} behind similar funds this year (by ${list(n.yearLag.map((l) => Math.abs(l.vsPeers).toFixed(2)))} points) but kept pace this month, so ${n.yearLag.length === 1 ? "it is" : "they are"} not flagged yet.`,
     );
   }
   return parts.join(" ");

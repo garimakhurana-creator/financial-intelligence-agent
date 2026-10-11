@@ -26,7 +26,13 @@ import { isAdmin } from "@/lib/auth";
 import { reportUrl } from "@/lib/delivery/deliver";
 import { whatsappShareLink, whatsappShareText } from "@/lib/delivery/share";
 import { VIEWS, type ViewId } from "@/lib/catalog";
-import { FUND_EMOJI, FUND_GRADIENT } from "@/lib/plain";
+import {
+  describeMove,
+  FUND_EMOJI,
+  FUND_GRADIENT,
+  INDEX_WORDS,
+} from "@/lib/plain";
+import { cn } from "@/lib/utils";
 import { WINDOWS } from "@/lib/calc/returns";
 import { loadReport } from "@/lib/view-data";
 
@@ -38,6 +44,94 @@ const STATUS_LABEL: Record<string, string> = {
   failed: "Failed",
   awaiting_configuration: "Awaiting configuration",
 };
+
+const pctText = (n: number | null | undefined) => {
+  if (n === null || n === undefined) return "—";
+  const r = Math.round(n * 100) / 100;
+  return `${r > 0 ? "+" : ""}${(r === 0 ? 0 : r).toFixed(2)}%`;
+};
+const toneCls = (n: number | null | undefined) =>
+  n == null
+    ? "text-muted-foreground"
+    : n > 0.004
+      ? "text-[var(--up)]"
+      : n < -0.004
+        ? "text-[var(--down)]"
+        : "";
+
+function GlanceTile({
+  emoji,
+  label,
+  value,
+  sub,
+}: {
+  emoji: string;
+  label: string;
+  value: React.ReactNode;
+  sub?: React.ReactNode;
+}) {
+  return (
+    <div className="rounded-3xl border bg-card p-4 shadow-card">
+      <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground">
+        <span aria-hidden className="text-lg">
+          {emoji}
+        </span>
+        {label}
+      </div>
+      <div className="font-display mt-2 text-xl font-bold leading-tight">
+        {value}
+      </div>
+      {sub && <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div>}
+    </div>
+  );
+}
+
+/** One horizontal bar per series around a shared zero line, so "who grew more" is visible at a glance. */
+function WeekBars({
+  items,
+}: {
+  items: { label: string; value: number | null; color: string }[];
+}) {
+  const max = Math.max(0.5, ...items.map((i) => Math.abs(i.value ?? 0)));
+  return (
+    <div className="space-y-1.5">
+      {items.map((i) => {
+        const w = i.value === null ? 0 : (Math.abs(i.value) / max) * 50;
+        return (
+          <div key={i.label} className="flex items-center gap-2 text-[11px]">
+            <span className="w-20 shrink-0 text-muted-foreground">
+              {i.label}
+            </span>
+            <div className="relative h-2.5 flex-1 rounded-full bg-muted">
+              <span
+                aria-hidden
+                className="absolute inset-y-0 left-1/2 w-px bg-[var(--axis)]"
+              />
+              {i.value !== null && (
+                <span
+                  className="absolute inset-y-0 rounded-full"
+                  style={{
+                    background: i.color,
+                    width: `${w}%`,
+                    left: i.value >= 0 ? "50%" : `${50 - w}%`,
+                  }}
+                />
+              )}
+            </div>
+            <span
+              className={cn(
+                "tabular w-14 shrink-0 text-right font-medium",
+                toneCls(i.value),
+              )}
+            >
+              {pctText(i.value)}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
 
 export default function ReportPage({ params }: PageProps<"/reports/[id]">) {
   return (
@@ -61,6 +155,31 @@ async function Report({
   const admin = await isAdmin();
   const evidence = new Map(p.news.map((n) => [n.evidenceId, n]));
   const shareText = whatsappShareText(report, reportUrl(report.id));
+  const weekly = p.funds.filter((f) => f.windows["1W"].fund.returnPct !== null);
+  const upCount = weekly.filter(
+    (f) => (f.windows["1W"].fund.returnPct as number) > 0.004,
+  ).length;
+  const compared = p.funds.filter(
+    (f) => f.windows["1W"].vsPeerPp !== null,
+  ).length;
+  const keptUp = p.funds.filter(
+    (f) =>
+      f.windows["1W"].vsPeerPp !== null &&
+      (f.windows["1W"].vsPeerPp as number) > -0.25,
+  ).length;
+  const best =
+    [...weekly].sort(
+      (a, b) =>
+        (b.windows["1W"].fund.returnPct as number) -
+        (a.windows["1W"].fund.returnPct as number),
+    )[0] ?? null;
+  const nifty = p.indices.find((i) => i.id === "NIFTY50") ?? null;
+  const moodIndices = ["NIFTY50", "NIFTY_MIDCAP150", "NIFTY_SMALLCAP100"]
+    .map((id) => p.indices.find((i) => i.id === id))
+    .filter((i): i is NonNullable<typeof i> => Boolean(i));
+  const screening = new Map(
+    report.inputSnapshot.funds.map((f) => [f.schemeCode, f.screening]),
+  );
   // The owner's number is only used for the signed-in owner; public visitors get a number-less link.
   const ownerNumber = admin ? process.env.WHATSAPP_SHARE_NUMBER?.trim() : null;
   const cite = (ids: string[]) =>
@@ -108,15 +227,21 @@ async function Report({
         </h1>
       </div>
 
-
-      <div className="flex flex-wrap items-center gap-2 text-sm">
+      <div className="flex flex-wrap items-center gap-2 text-sm print:hidden">
         <a
           href={whatsappShareLink(shareText)}
           target="_blank"
           rel="noopener noreferrer"
-          className="rounded-full border bg-card px-4 py-2 font-medium shadow-card hover:bg-muted"
+          className="rounded-full bg-[#25D366] px-4 py-2 font-semibold text-[#073b1f] shadow-card hover:brightness-95"
         >
           💬 Share on WhatsApp
+        </a>
+        <a
+          href={`/api/reports/${report.id}/pdf`}
+          download
+          className="rounded-full border bg-card px-4 py-2 font-semibold shadow-card hover:bg-muted"
+        >
+          ⬇️ Download PDF
         </a>
         {ownerNumber && (
           <a
@@ -128,13 +253,56 @@ async function Report({
             Send to my WhatsApp
           </a>
         )}
-        <span className="text-xs text-muted-foreground">
-          Opens WhatsApp with the summary filled in — you press Send.
-        </span>
       </div>
 
+      <section
+        aria-label="This week at a glance"
+        className="grid grid-cols-2 gap-3 lg:grid-cols-4"
+      >
+        <GlanceTile
+          emoji="📈"
+          label="Funds up this week"
+          value={`${upCount} of ${weekly.length}`}
+          sub={
+            upCount === weekly.length
+              ? "every fund grew"
+              : upCount === 0
+                ? "a down week across the board"
+                : "the rest were flat or down"
+          }
+        />
+        <GlanceTile
+          emoji="🤝"
+          label="Kept up with similar funds"
+          value={`${keptUp} of ${compared}`}
+          sub="within 0.25 points or better"
+        />
+        {best && (
+          <GlanceTile
+            emoji="🏆"
+            label="Best this week"
+            value={
+              <span className={toneCls(best.windows["1W"].fund.returnPct)}>
+                {pctText(best.windows["1W"].fund.returnPct)}
+              </span>
+            }
+            sub={shortFundName(best.schemeName)}
+          />
+        )}
+        {nifty && (
+          <GlanceTile
+            emoji={describeMove(nifty.windows["1W"].returnPct).emoji}
+            label="Big companies (Nifty 50)"
+            value={describeMove(nifty.windows["1W"].returnPct).words}
+            sub={`${pctText(nifty.windows["1W"].returnPct)} this week`}
+          />
+        )}
+      </section>
+
       <section>
-        <h2 className="mb-4 text-xl font-bold">How each fund did</h2>
+        <h2 className="mb-4 text-xl font-bold">
+          How each fund did <span aria-hidden>🏃</span>
+        </h2>
         <div className="grid gap-4 lg:grid-cols-2">
           {p.output.funds.map((f) => {
             const perf = p.funds.find((x) => x.schemeCode === f.schemeCode);
@@ -153,31 +321,129 @@ async function Report({
                   >
                     {FUND_EMOJI[perf?.viewId as ViewId] ?? "💼"}
                   </span>
-                  <h3 className="font-semibold leading-snug">
-                    <Link
-                      href={`/funds/${f.schemeCode}`}
-                      className="hover:underline"
+                  <div className="min-w-0 flex-1">
+                    <h3 className="font-semibold leading-snug">
+                      <Link
+                        href={`/funds/${f.schemeCode}`}
+                        className="hover:underline"
+                      >
+                        {shortFundName(
+                          perf?.schemeName ?? String(f.schemeCode),
+                        )}
+                      </Link>
+                    </h3>
+                    {screening.get(f.schemeCode)?.flag ? (
+                      <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[var(--tint-warning)] px-2 py-0.5 text-[11px] font-medium">
+                        👀 Worth watching
+                      </span>
+                    ) : (
+                      <span className="mt-1 inline-flex items-center gap-1 rounded-full bg-[var(--tint-good)] px-2 py-0.5 text-[11px] font-medium">
+                        👍 On track
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <div
+                      className={cn(
+                        "font-display text-2xl font-bold tabular",
+                        toneCls(perf?.windows["1W"].fund.returnPct),
+                      )}
                     >
-                      {shortFundName(perf?.schemeName ?? String(f.schemeCode))}
-                    </Link>
-                  </h3>
+                      {pctText(perf?.windows["1W"].fund.returnPct)}
+                    </div>
+                    <div className="text-[11px] text-muted-foreground">
+                      this week
+                    </div>
+                  </div>
                 </div>
-                <ul className="mt-4 space-y-3 leading-relaxed">
-                  <li className="flex gap-3">
-                    <span aria-hidden>📊</span>
-                    <span>{f.performance}</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span aria-hidden>⚖️</span>
-                    <span>{f.comparison}</span>
-                  </li>
-                  <li className="flex gap-3">
-                    <span aria-hidden>🌍</span>
-                    <span>
-                      {f.marketContext}
-                      {cite(f.evidenceIds)}
-                    </span>
-                  </li>
+
+                {perf && (
+                  <>
+                    <div className="mt-4 grid grid-cols-3 gap-2 text-center text-xs">
+                      {(
+                        [
+                          ["📅", "Week", perf.windows["1W"].fund.returnPct],
+                          ["🗓️", "Month", perf.windows["1M"].fund.returnPct],
+                          ["📆", "This year", perf.windows.YTD.fund.returnPct],
+                        ] as const
+                      ).map(([emoji, label, v]) => (
+                        <div
+                          key={label}
+                          className="rounded-2xl bg-muted/60 px-2 py-2"
+                        >
+                          <div className="text-muted-foreground">
+                            <span aria-hidden>{emoji}</span> {label}
+                          </div>
+                          <div
+                            className={cn(
+                              "mt-0.5 font-semibold tabular",
+                              toneCls(v),
+                            )}
+                          >
+                            {pctText(v)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="mt-4">
+                      <WeekBars
+                        items={[
+                          {
+                            label: "This fund",
+                            value: perf.windows["1W"].fund.returnPct,
+                            color: "var(--brand)",
+                          },
+                          ...(perf.benchmark
+                            ? [
+                                {
+                                  label: "Its index",
+                                  value:
+                                    perf.windows["1W"].benchmark?.returnPct ??
+                                    null,
+                                  color: "var(--series-2)",
+                                },
+                              ]
+                            : []),
+                          {
+                            label: "Similar funds",
+                            value: perf.windows["1W"].peer?.mean ?? null,
+                            color: "var(--series-3)",
+                          },
+                        ]}
+                      />
+                    </div>
+                  </>
+                )}
+
+                <ul className="mt-4 space-y-3 text-[15px] leading-relaxed">
+                  {(
+                    [
+                      ["📊", "How it did", f.performance, null],
+                      ["⚖️", "Compared with others", f.comparison, null],
+                      [
+                        "🌍",
+                        "What was going on",
+                        f.marketContext,
+                        f.evidenceIds,
+                      ],
+                    ] as const
+                  ).map(([emoji, label, text, ev]) => (
+                    <li key={label} className="flex gap-3">
+                      <span
+                        aria-hidden
+                        className="grid size-8 shrink-0 place-items-center rounded-xl bg-muted text-base"
+                      >
+                        {emoji}
+                      </span>
+                      <span>
+                        <span className="block text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+                          {label}
+                        </span>
+                        {text}
+                        {ev && cite([...ev])}
+                      </span>
+                    </li>
+                  ))}
                 </ul>
                 {perf && (
                   <details className="group mt-3">
@@ -260,14 +526,56 @@ async function Report({
         <h2 className="mb-3 text-xl font-bold">
           The market this week <span aria-hidden>🌡️</span>
         </h2>
-        <p className="max-w-3xl rounded-3xl bg-[#16181d] p-6 text-lg leading-relaxed text-white shadow-card">
+        {moodIndices.length > 0 && (
+          <div className="mb-3 grid gap-3 sm:grid-cols-3">
+            {moodIndices.map((ix) => {
+              const mv = describeMove(ix.windows["1W"].returnPct);
+              return (
+                <div
+                  key={ix.id}
+                  className="flex items-center gap-3 rounded-3xl border bg-card p-4 shadow-card"
+                >
+                  <span
+                    className="grid size-11 shrink-0 place-items-center rounded-2xl bg-muted text-xl"
+                    aria-hidden
+                  >
+                    {mv.emoji}
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-xs text-muted-foreground">
+                      {INDEX_WORDS[ix.id] ?? ix.name}
+                    </div>
+                    <div
+                      className={cn(
+                        "font-semibold",
+                        mv.tone === "good" && "text-[var(--up)]",
+                        mv.tone === "bad" && "text-[var(--down)]",
+                      )}
+                    >
+                      {mv.words}{" "}
+                      <span className="tabular text-xs font-normal text-muted-foreground">
+                        {pctText(ix.windows["1W"].returnPct)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+        <p className="rounded-3xl bg-[#16181d] p-6 text-lg leading-relaxed text-white shadow-card">
+          <span aria-hidden className="mr-2">
+            🗞️
+          </span>
           {p.output.marketSummary.text}
           {cite(p.output.marketSummary.evidenceIds)}
         </p>
       </section>
 
       <section>
-        <h2 className="mb-4 text-xl font-bold">By kind of fund</h2>
+        <h2 className="mb-4 text-xl font-bold">
+          By kind of fund <span aria-hidden>🧭</span>
+        </h2>
         <KindTabs
           label="Kind of fund"
           items={p.output.categories.map((c) => ({
@@ -276,18 +584,31 @@ async function Report({
             emoji: FUND_EMOJI[c.viewId],
             content: (
               <div className="h-full rounded-3xl border bg-card p-5 shadow-card">
-                <Link href={`/categories/${c.viewId}`} className="text-xs font-medium uppercase tracking-wide text-muted-foreground hover:underline">
-                  <span aria-hidden>{FUND_EMOJI[c.viewId]}</span> {VIEWS[c.viewId].title}
+                <Link
+                  href={`/categories/${c.viewId}`}
+                  className="text-xs font-medium uppercase tracking-wide text-muted-foreground hover:underline"
+                >
+                  <span aria-hidden>{FUND_EMOJI[c.viewId]}</span>{" "}
+                  {VIEWS[c.viewId].title}
                 </Link>
-                {c.headline.trim().toLowerCase() !== VIEWS[c.viewId].title.toLowerCase() && <h3 className="mt-1 font-semibold">{c.headline}</h3>}
+                {c.headline.trim().toLowerCase() !==
+                  VIEWS[c.viewId].title.toLowerCase() && (
+                  <h3 className="mt-1 font-semibold">{c.headline}</h3>
+                )}
                 <p className="mt-1 text-sm leading-relaxed">
                   {c.summary}
                   {cite(c.evidenceIds)}
                 </p>
                 {c.watchItems.length > 0 && (
-                  <ul className="mt-2 list-disc pl-5 text-sm text-[var(--ink-secondary)]">
+                  <ul className="mt-3 space-y-1.5 text-sm text-[var(--ink-secondary)]">
                     {c.watchItems.map((w) => (
-                      <li key={w}>{w}</li>
+                      <li
+                        key={w}
+                        className="flex gap-2 rounded-2xl bg-muted/60 px-3 py-2"
+                      >
+                        <span aria-hidden>👀</span>
+                        <span>{w}</span>
+                      </li>
                     ))}
                   </ul>
                 )}
@@ -298,8 +619,15 @@ async function Report({
       </section>
 
       <section>
-        <h2 className="mb-4 text-xl font-bold">Overall assessment</h2>
-        <WeatherHero label={report.assessment} reason={report.assessmentReason} weekEnding={report.weekEnding} reportId={null} />
+        <h2 className="mb-4 text-xl font-bold">
+          Overall assessment <span aria-hidden>✅</span>
+        </h2>
+        <WeatherHero
+          label={report.assessment}
+          reason={report.assessmentReason}
+          weekEnding={report.weekEnding}
+          reportId={null}
+        />
       </section>
 
       <details className="group rounded-3xl border bg-card shadow-card">

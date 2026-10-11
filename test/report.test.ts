@@ -230,7 +230,7 @@ describe("assessment reason never hides a fall (screen-v2)", () => {
     expect(s.label).toBe("No action needed");
     expect(s.rationale).toMatch(/fell 3\.66%–5\.36% this month/);
     expect(s.rationale).toMatch(/market-wide dip/);
-    expect(s.rationale).toMatch(/behind similar funds this year/);
+    expect(s.rationale).toMatch(/behind similar funds this year \(by 3\.97 and 3\.59 points\) but kept pace this month, so they are not flagged yet/);
   });
 
   it("does not call a fall market-wide when the market rose", () => {
@@ -257,5 +257,16 @@ describe("assessment reason never hides a fall (screen-v2)", () => {
     });
     expect(JARGON_RE.test(s.rationale)).toBe(false);
     expect(s.rationale.split(/\s+/).length).toBeLessThanOrEqual(MAX_REASON_WORDS);
+  });
+});
+
+describe("closing summary mentions unflagged year-long lags", () => {
+  it("rejects a reason that leaves out a fund behind similar funds this year", () => {
+    const input = makeInput();
+    input.screening.notes = { marketDip: [], yearLag: [{ name: "Nippon India Small Cap Fund", vsPeers: -3.59 }] };
+    const o = goodOutput();
+    expect(validateReport(o, input).errors.join()).toMatch(/mention that Nippon India Small Cap Fund/);
+    o.assessment.reason = `${o.assessment.reason} Nippon is behind similar funds this year but kept pace this month.`;
+    expect(validateReport(o, input).errors.join()).not.toMatch(/mention that Nippon/);
   });
 });

@@ -142,6 +142,12 @@ export function validateReport(raw: unknown, input: ReportInput): ValidationResu
   if (jargon) errors.push(`assessment.reason: replace the jargon word "${jargon[0]}" with everyday words`);
   const reasonWords = a.reason.trim().split(/\s+/).length;
   if (reasonWords > MAX_REASON_WORDS) errors.push(`assessment.reason: ${reasonWords} words — keep it under ${MAX_REASON_WORDS}`);
+  // A fund behind similar funds this year but not flagged must still be mentioned, so the closing
+  // summary never hides it (and says why it is not flagged).
+  for (const lag of input.screening.notes?.yearLag ?? []) {
+    const key = lag.name.split(/\s+/)[0].toLowerCase();
+    if (!a.reason.toLowerCase().includes(key)) errors.push(`assessment.reason: mention that ${lag.name} is behind similar funds this year but kept pace this month, so it is not flagged`);
+  }
   if (a.label === "One fund worth watching") {
     if (a.fundOfConcern === null || !fundCodes.includes(a.fundOfConcern)) errors.push("assessment: 'One fund worth watching' must name a tracked fund in fundOfConcern");
   } else if (a.fundOfConcern !== null && !fundCodes.includes(a.fundOfConcern)) {

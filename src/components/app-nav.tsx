@@ -29,8 +29,8 @@ export const PRIMARY_NAV = [
   { href: "/", label: "My Dashboard", Icon: LayoutDashboard },
   { href: "/portfolio", label: "My Portfolio", Icon: Wallet },
   { href: "/market", label: "Market & News", Icon: Newspaper },
-  { href: "/explore", label: "Explore Funds", Icon: Compass },
   { href: "/analyse", label: "Analyse a Fund", Icon: FileSearch },
+  { href: "/explore", label: "Explore Funds", Icon: Compass },
   { href: "/reports", label: "Weekly Reports", Icon: BookOpen },
   { href: "/calculator", label: "Calculator", Icon: Calculator },
 ] as const;
