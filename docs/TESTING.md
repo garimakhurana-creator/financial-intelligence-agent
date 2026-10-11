@@ -14,7 +14,7 @@ npx tsx --env-file=.env.local scripts/smoke-sources.ts   # live check of every d
 
 | Check | Result |
 |---|---|
-| `npm test` | **46 passed / 46** (4 files) |
+| `npm test` | **51 passed / 51** (5 files) |
 | `npm run typecheck` | 0 errors |
 | `npm run lint` | 0 errors, 0 warnings |
 | `npm run build` | succeeded (Next.js 16.4, all pages partially prerendered, API routes dynamic) |
@@ -25,7 +25,8 @@ npx tsx --env-file=.env.local scripts/smoke-sources.ts   # live check of every d
 |---|---|
 | `test/returns.test.ts` (18) | MFapi/AMFI date parsing; month-end clamping; calendar YTD reference; IST vs UTC "today"; return formula; zero/negative/NaN reference; holiday snapping (2 Oct → 1 Oct); insufficient history → unavailable (not 0%); data gap beyond 7 days; stale current NAV; invalid NAV rows dropped; benchmark anchored to the fund's dates; excess return null handling |
 | `test/peers.test.ts` (3) | Equal-weighted mean and median; peers with missing data excluded (not counted as 0%); no average below the minimum sample; limited-sample label |
-| `test/report.test.ts` (15) | Sentence counting with decimals/abbreviations; validator accepts a grounded report; rejects numbers not in the input, multi-sentence fields, buy/sell instructions, unknown evidence ids, missing category views, inconsistent "One fund worth watching", labels outside the three allowed; fallback always validates; retry-with-feedback then success; fallback after repeated failure; screening thresholds for equity, index and debt funds; label mapping |
+| `test/report.test.ts` (17) | Sentence counting with decimals/abbreviations; validator accepts a grounded report; rejects numbers not in the input, multi-sentence fields, buy/sell instructions, unknown evidence ids, missing category views, inconsistent "One fund worth watching", labels outside the three allowed; fallback always validates; retry-with-feedback then success; fallback after repeated failure; screening thresholds for equity, index and debt funds; label mapping; jargon kept out of everything Meera reads |
+| `test/plain.test.ts` (3) | Fixed gap-to-words mapping (about the same / slightly better / behind); missing data never gets a comparison word; signed formatting |
 | `test/delivery.test.ts` (10) | Email HTML escaping (model/user text), test labelling, plain-text link; Telegram splitting under 4,096 chars without dropping funds; recipient masking; WhatsApp template parameter cleaning; Yahoo null closes dropped; weekend prints dropped only for FX; wa.me number normalisation and number-less public link |
 
 ### Integration checks run against real services (not mocked)

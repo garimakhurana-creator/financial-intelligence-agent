@@ -2,6 +2,7 @@ import { MAX_CURRENT_STALENESS_DAYS, MAX_REFERENCE_GAP_DAYS } from "@/lib/calc/r
 import { MIN_PEERS_FOR_AVERAGE, MIN_PEERS_FOR_RELIABLE } from "@/lib/calc/peers";
 import { PEER_RULES, SEED_FUNDS } from "@/lib/catalog";
 import { THRESHOLDS } from "@/lib/report/screening";
+import { GAP_CLEAR, GAP_SAME } from "@/lib/plain";
 
 export const metadata = { title: "Methodology · Meera's Fund Tracker" };
 
@@ -92,6 +93,15 @@ export default function Methodology() {
         </li>
         <li>Index funds: drifting more than ±{THRESHOLDS.indexTracking1M} pp from their index over 1 month.</li>
         <li>0 flagged → “No action needed”; 1 → “One fund worth watching”; 2+ → “Consider reviewing your allocation”.</li>
+      </ul>
+
+      <H>The words on the home page</H>
+      <p>The simple view turns this week&apos;s gap (in percentage points) into fixed words, so the same numbers always read the same way:</p>
+      <ul>
+        <li>
+          Gap smaller than {GAP_SAME} points → &ldquo;about the same as&rdquo;; {GAP_SAME}–{GAP_CLEAR} points → &ldquo;slightly better than / slightly behind&rdquo;; {GAP_CLEAR} points or more → &ldquo;better than / behind&rdquo;.
+        </li>
+        <li>&ldquo;On track&rdquo; / &ldquo;Keep an eye&rdquo; on each fund card uses the same screen as the overall assessment, so one bad week never changes it.</li>
       </ul>
 
       <H>How the AI is kept honest</H>
