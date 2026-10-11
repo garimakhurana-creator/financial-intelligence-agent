@@ -41,7 +41,7 @@ function makeInput(): ReportInput {
     breadthDate: null,
     news: [{ id: "N1", title: "RBI hikes repo rate by 25 basis points to 5.5%", publisher: "NDTV", publishedAt: "2026-10-07T04:39:16Z", url: "https://example.com/a", summary: "", views: ["short_debt"] }],
     views: VIEW_IDS.map((id) => ({ id, title: id, focus: "", fundCodes: id === "mid_cap" ? [118989] : [], indexIds: id === "mid_cap" ? ["NIFTY_MIDCAP150"] : [] })),
-    screening: { suggestedLabel: "No action needed", rationale: "No fund shows persistent underperformance." },
+    screening: { suggestedLabel: "No action needed", rationale: "All your funds moved in line with their markets, so there is nothing to do this week." },
   };
 }
 
@@ -51,8 +51,8 @@ function goodOutput(): ReportOutput {
       {
         schemeCode: 118989,
         performance: "HDFC Mid Cap Fund rose 0.17% this week, fell 5.36% over the month and is down 2.19% this year.",
-        comparison: "It was 0.36 percentage points ahead of the Nifty Midcap 150 and 0.24 points ahead of the mid-cap peer average this week.",
-        marketContext: "The week coincided with the RBI raising its repo rate by 25 basis points to 5.5%, which may have weighed on rate-sensitive stocks.",
+        comparison: "It was 0.36 points ahead of the Nifty Midcap 150 and 0.24 points ahead of similar mid-cap funds this week.",
+        marketContext: "The week coincided with the RBI raising its main interest rate to 5.5%, which may have weighed on rate-sensitive stocks.",
         evidenceIds: ["N1"],
       },
     ],
@@ -64,7 +64,7 @@ function goodOutput(): ReportOutput {
       evidenceIds: [],
     })),
     marketSummary: { text: "Markets were mixed this week, with mid caps slipping 0.19% while rates moved higher.", evidenceIds: ["N1"] },
-    assessment: { label: "No action needed", reason: "None of the funds is persistently behind its peer group, so there is nothing to act on.", fundOfConcern: null },
+    assessment: { label: "No action needed", reason: "None of the funds has been lagging similar funds for long, so there is nothing to act on.", fundOfConcern: null },
   };
 }
 
@@ -174,5 +174,18 @@ describe("screening", () => {
     expect(suggestLabel([]).label).toBe("No action needed");
     expect(suggestLabel([{ name: "A", reason: "x" }]).label).toBe("One fund worth watching");
     expect(suggestLabel([{ name: "A", reason: "x" }, { name: "B", reason: "y" }]).label).toBe("Consider reviewing your allocation");
+  });
+});
+
+describe("plain-language headline", () => {
+  it("rejects jargon in the assessment reason", () => {
+    const o = goodOutput();
+    o.assessment.reason = "No fund shows persistent underperformance versus its peers this week.";
+    expect(validateReport(o, makeInput()).errors.join()).toMatch(/jargon/);
+  });
+  it("screen rationales are themselves jargon-free, so the fallback always passes", () => {
+    for (const r of [suggestLabel([]), suggestLabel([{ name: "A", reason: "it has been behind similar funds." }]), suggestLabel([{ name: "A", reason: "x" }, { name: "B", reason: "y" }])]) {
+      expect(r.rationale).not.toMatch(/benchmark|peer|underperform|YTD/i);
+    }
   });
 });

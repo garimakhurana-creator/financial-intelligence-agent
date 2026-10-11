@@ -4,6 +4,10 @@ import { ReportOutput, type ReportInput } from "@/lib/report/types";
 /** Plain-language guard: the prompt asks for ≤ 40 words; we allow a little slack. */
 export const MAX_SENTENCE_WORDS = 50;
 
+/** Analyst words kept out of the headline reason Meera reads first. */
+export const JARGON_RE = /\b(benchmarks?|peers?|peer group|underperform\w*|outperform\w*|YTD|basis points|allocation|volatility)\b/i;
+export const MAX_REASON_WORDS = 45;
+
 /** Phrases that would turn a monitoring report into a trade instruction. */
 const ADVICE_RE = /\b(buy|sell|redeem|exit (?:the|this) fund|switch (?:out|to)|book profits?|stop (?:your|the) sip|increase (?:your|the) sip|invest more|guarantee[ds]?)\b/i;
 
@@ -103,6 +107,8 @@ export function validateReport(raw: unknown, input: ReportInput): ValidationResu
       const words = f[k].trim().split(/\s+/).length;
       if (words > MAX_SENTENCE_WORDS) errors.push(`fund ${f.schemeCode}.${k}: ${words} words — keep it under ${MAX_SENTENCE_WORDS} for a non-expert reader`);
       checkText(`fund ${f.schemeCode}.${k}`, f[k]);
+      const j = JARGON_RE.exec(f[k]);
+      if (j) errors.push(`fund ${f.schemeCode}.${k}: replace the jargon word "${j[0]}" with everyday words`);
     }
     checkEvidence(`fund ${f.schemeCode}`, f.evidenceIds);
   }
@@ -119,6 +125,10 @@ export function validateReport(raw: unknown, input: ReportInput): ValidationResu
 
   const a = out.assessment;
   checkText("assessment", a.reason);
+  const jargon = JARGON_RE.exec(a.reason);
+  if (jargon) errors.push(`assessment.reason: replace the jargon word "${jargon[0]}" with everyday words`);
+  const reasonWords = a.reason.trim().split(/\s+/).length;
+  if (reasonWords > MAX_REASON_WORDS) errors.push(`assessment.reason: ${reasonWords} words — keep it under ${MAX_REASON_WORDS}`);
   if (a.label === "One fund worth watching") {
     if (a.fundOfConcern === null || !fundCodes.includes(a.fundOfConcern)) errors.push("assessment: 'One fund worth watching' must name a tracked fund in fundOfConcern");
   } else if (a.fundOfConcern !== null && !fundCodes.includes(a.fundOfConcern)) {

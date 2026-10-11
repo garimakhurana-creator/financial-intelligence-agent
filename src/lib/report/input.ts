@@ -9,6 +9,24 @@ import { REPORT_SCHEMA_VERSION, type FundInput, type ReportInput } from "@/lib/r
 
 const shortName = (n: string) => n.replace(/\s*-\s*Direct Plan.*$/i, "").replace(/\s*-\s*Growth.*$/i, "").trim();
 
+/** Rounded fund / benchmark / peer figures per window — the exact numbers the report and screen use. */
+export function metricTriples(f: Pick<FundPerformance, "windows">): FundInput["returns"] {
+  const returns = {} as FundInput["returns"];
+  for (const w of WINDOWS) {
+    const c = f.windows[w];
+    returns[w] = {
+      fund: round(c.fund.returnPct),
+      benchmark: round(c.benchmark?.returnPct ?? null),
+      peerAverage: round(c.peer?.mean ?? null),
+      vsBenchmarkPp: round(c.vsBenchmarkPp),
+      vsPeerPp: round(c.vsPeerPp),
+      referenceDate: c.fund.referenceDate,
+      peerCount: c.peer?.n ?? 0,
+    };
+  }
+  return returns;
+}
+
 export function buildReportInput(args: {
   weekEnding: ISODate;
   investorName: string;
@@ -18,19 +36,7 @@ export function buildReportInput(args: {
   news: (NewsItem & { id: string })[];
 }): ReportInput {
   const funds: FundInput[] = args.funds.map((f) => {
-    const returns = {} as FundInput["returns"];
-    for (const w of WINDOWS) {
-      const c = f.windows[w];
-      returns[w] = {
-        fund: round(c.fund.returnPct),
-        benchmark: round(c.benchmark?.returnPct ?? null),
-        peerAverage: round(c.peer?.mean ?? null),
-        vsBenchmarkPp: round(c.vsBenchmarkPp),
-        vsPeerPp: round(c.vsPeerPp),
-        referenceDate: c.fund.referenceDate,
-        peerCount: c.peer?.n ?? 0,
-      };
-    }
+    const returns = metricTriples(f);
     return {
       schemeCode: f.schemeCode,
       name: shortName(f.schemeName),

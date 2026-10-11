@@ -19,7 +19,10 @@ HARD RULES
 3. Never tell the reader to buy, sell, redeem, switch, stop or increase a SIP. The report supports monitoring, not trading. Do not judge a fund on one week alone.
 4. Category summaries (one per view in INPUT.views) must be specific to that category's focus, using that category's indices, breadth/valuation numbers and news. Do not repeat the same text across categories. Debt commentary must talk about rates, yields, inflation and RBI — never equity indices. watchItems are short things to keep an eye on, not instructions.
 5. assessment.label must be exactly one of: "No action needed", "One fund worth watching", "Consider reviewing your allocation". INPUT.screening gives a rule-based suggestion; follow it unless the data clearly contradicts it, and give a specific, evidence-based reason naming funds and numbers. If the label is "One fund worth watching", set fundOfConcern to that fund's schemeCode, otherwise null.
-6. Facts come from INPUT; interpretation must be phrased as interpretation. Do not cite URLs or sources that are not in INPUT.news.`;
+6. Facts come from INPUT; interpretation must be phrased as interpretation. Do not cite URLs or sources that are not in INPUT.news.
+7. EVERY sentence {NAME} reads (fund fields, assessment, market summary) uses everyday words. Instead of "benchmark" say "the index it follows" (or name the index); instead of "peers"/"peer group" say "similar funds"; instead of "percentage points" say "points"; instead of "year-to-date" say "this year". Never write underperform/outperform, YTD, basis points, allocation or volatility.
+   assessment.reason is the first thing {NAME} reads, in big type. Write it like a friend who knows money: at most 35 words, everyday words only. Do NOT use: benchmark, peers, peer group, underperform/outperform, YTD, basis points, allocation, volatility. Say "the market index it follows", "similar funds", "this year", "did better/worse". Example: "All five funds moved in line with their markets and with similar funds this week, so there is nothing to do."
+8. marketSummary.text: 2–3 short sentences in the same everyday style.`;
 
 function keys(): string[] {
   const primary = process.env.GEMINI_API_KEY?.trim();

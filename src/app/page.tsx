@@ -1,135 +1,114 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { ArrowRight } from "lucide-react";
-import { AssessmentBanner, FundTable, IndexTile, NewsList, SectionTitle } from "@/components/blocks";
-import { Freshness, Timestamp } from "@/components/format";
+import { FundCard, MarketStrip, VerdictHero } from "@/components/simple";
 import { Skeleton } from "@/components/ui/skeleton";
-import { VIEWS, VIEW_IDS } from "@/lib/catalog";
+import { VIEWS, VIEW_IDS, type ViewId } from "@/lib/catalog";
+import { formatHuman } from "@/lib/dates";
+import { optionalEnv } from "@/lib/env";
+import { FUND_KIND } from "@/lib/plain";
+import { metricTriples } from "@/lib/report/input";
+import { screenFund } from "@/lib/report/screening";
 import { loadDashboard } from "@/lib/view-data";
 
 export default function Home() {
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight">How are Meera&apos;s funds doing?</h1>
-        <p className="mt-1 max-w-2xl text-[var(--ink-secondary)]">
-          Each fund&apos;s returns, set against the index it aims to match and the average of similar funds — with a plain-language weekly read-out every Saturday.
-        </p>
-      </div>
-      <Suspense fallback={<DashboardSkeleton />}>
-        <Dashboard />
-      </Suspense>
-    </div>
+    <Suspense fallback={<HomeSkeleton />}>
+      <SimpleHome />
+    </Suspense>
   );
 }
 
-async function Dashboard() {
+async function SimpleHome() {
   let d;
   try {
     d = await loadDashboard();
-  } catch (e) {
+  } catch {
     return (
-      <div role="alert" className="rounded-xl border bg-[var(--tint-critical)] p-5">
-        <p className="font-medium">The dashboard could not load data from the database.</p>
-        <p className="mt-1 text-sm text-[var(--ink-secondary)]">{e instanceof Error ? e.message : "Unknown error"}. Check the database configuration on the Manage page.</p>
+      <div role="alert" className="rounded-2xl border bg-[var(--tint-critical)] p-6">
+        <p className="font-medium">We couldn&apos;t load your funds right now.</p>
+        <p className="mt-1 text-sm text-[var(--ink-secondary)]">Please try again in a minute. If it keeps happening, check the Manage page.</p>
       </div>
     );
   }
-  const latestNav = d.performance.map((p) => p.nav?.date).filter(Boolean).sort().at(-1) ?? null;
-  const breadth = (name: string) => d.snapshot?.data.find((s) => s.index === name);
-  const NSE_NAME: Record<string, string> = { NIFTY50: "NIFTY 50", NIFTY_MIDCAP150: "NIFTY MIDCAP 150", NIFTY_SMALLCAP100: "NIFTY SMALLCAP 100" };
+  const name = optionalEnv("INVESTOR_NAME", "Meera");
+  const report = d.latestReport;
+  const navDate = d.performance.map((p) => p.nav?.date).filter(Boolean).sort().at(-1) ?? null;
 
   return (
-    <>
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <Freshness date={latestNav} today={d.asOf} label="NAVs" />
-        {d.snapshot && <Freshness date={d.snapshot.date} today={d.asOf} label="Market breadth" />}
-        {d.runs[0] && (
-          <span className="text-xs text-muted-foreground">
-            Last scheduled job: {d.runs[0].job} · {d.runs[0].status} · <Timestamp iso={d.runs[0].finishedAt ?? d.runs[0].startedAt} />
-          </span>
-        )}
-      </div>
-
-      {d.latestReport ? (
-        <AssessmentBanner
-          label={d.latestReport.assessment}
-          reason={d.latestReport.assessmentReason}
-          weekEnding={d.latestReport.weekEnding}
-          href={`/reports/${d.latestReport.id}`}
-          generator={d.latestReport.generator}
-        />
+    <div className="space-y-8">
+      {report ? (
+        <VerdictHero name={name} label={report.assessment} reason={report.assessmentReason} weekEnding={report.weekEnding} reportId={report.id} />
       ) : (
-        <div className="rounded-xl border border-dashed p-5 text-sm">No weekly report has been generated yet. The first one is produced on Saturday morning, or on demand from the Manage page.</div>
+        <section className="rounded-2xl border bg-card p-6">
+          <p className="text-sm text-[var(--ink-secondary)]">Hi {name}</p>
+          <h1 className="mt-2 text-2xl font-semibold">Your first weekly report arrives on Saturday morning.</h1>
+        </section>
       )}
 
       <section>
-        <SectionTitle sub="Returns are point-to-point from published NAVs. Click a fund for its chart, the exact dates used and the methodology.">Your funds</SectionTitle>
-        <FundTable funds={d.performance} />
-      </section>
-
-      <section>
-        <SectionTitle sub="Price indices (not total-return). Breadth and valuation come from NSE's latest session.">Market this week</SectionTitle>
-        <div className="grid gap-3 sm:grid-cols-3">
-          {d.headline.map((ix) => {
-            const b = breadth(NSE_NAME[ix.id]);
-            return <IndexTile key={ix.id} ix={ix} note={b ? `P/E ${b.pe ?? "n/a"} · ${b.advances ?? "?"} up / ${b.declines ?? "?"} down` : undefined} />;
-          })}
+        <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+          <h2 className="text-lg font-semibold">Your {d.performance.length} funds</h2>
+          {navDate && <p className="text-sm text-muted-foreground">Latest prices from {formatHuman(navDate)}</p>}
         </div>
+        {d.performance.length === 0 ? (
+          <p className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+            No funds yet. <Link href="/manage" className="underline">Add one using its scheme code</Link>.
+          </p>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2">
+            {d.performance.map((p) => {
+              const status = !p.nav ? "delayed" : screenFund(p.viewId, metricTriples(p)).flag ? "watch" : "ok";
+              const why = report?.report.output.funds.find((f) => f.schemeCode === p.schemeCode);
+              return <FundCard key={p.schemeCode} perf={p} status={status} why={why} />;
+            })}
+          </div>
+        )}
+        <p className="mt-3 text-xs text-muted-foreground">
+          &ldquo;On track&rdquo; means no lasting slip against similar funds; one bad week alone never changes it. Comparisons are for this week.{" "}
+          <Link href="/methodology" className="underline">How we decide</Link>
+        </p>
       </section>
 
+      <MarketStrip indices={d.headline} summary={report?.report.output.marketSummary.text} />
+
       <section>
-        <SectionTitle sub="Five separate views, each with its own benchmark, peers and market context.">Category intelligence</SectionTitle>
+        <h2 className="mb-3 text-lg font-semibold">Explore by fund type</h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {VIEW_IDS.map((id) => {
-            const summary = d.latestReport?.report.output.categories.find((c) => c.viewId === id);
+          {VIEW_IDS.map((id: ViewId) => {
+            const c = report?.report.output.categories.find((x) => x.viewId === id);
             return (
-              <Link key={id} href={`/categories/${id}`} className="group flex flex-col rounded-xl border bg-card p-4 hover:border-foreground/30">
-                <span className="text-sm font-semibold">{VIEWS[id].title}</span>
-                <span className="mt-1 line-clamp-3 flex-1 text-xs leading-relaxed text-muted-foreground">{summary?.headline ?? "No summary yet"}</span>
-                <span className="mt-3 inline-flex items-center gap-1 text-xs font-medium">
-                  Open view <ArrowRight className="size-3 transition-transform group-hover:translate-x-0.5" aria-hidden />
-                </span>
+              <Link key={id} href={`/categories/${id}`} className="rounded-xl border bg-card p-4 hover:border-foreground/30">
+                <div className="text-sm font-semibold">{VIEWS[id].title}</div>
+                <div className="mt-1 text-xs leading-relaxed text-muted-foreground">{c?.headline ?? FUND_KIND[id]}</div>
               </Link>
             );
           })}
         </div>
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[2fr_1fr]">
-        <div>
-          <SectionTitle sub={d.latestReport ? `Retrieved for the week ending ${d.latestReport.weekEnding}; publication dates shown.` : undefined}>Important developments</SectionTitle>
-          <NewsList items={d.news} showViews />
-        </div>
-        <div>
-          <SectionTitle>Reports</SectionTitle>
-          <div className="space-y-2 rounded-xl border bg-card p-4 text-sm">
-            {d.latestReport ? (
-              <Link href={`/reports/${d.latestReport.id}`} className="block font-medium hover:underline">
-                Latest: week ending {d.latestReport.weekEnding}
-              </Link>
-            ) : (
-              <p className="text-muted-foreground">No reports yet.</p>
-            )}
-            <Link href="/reports" className="block text-muted-foreground hover:underline">
-              Browse the archive →
-            </Link>
-          </div>
-        </div>
-      </section>
-    </>
+      <nav aria-label="More" className="flex flex-wrap gap-x-6 gap-y-2 border-t pt-5 text-sm">
+        <Link href="/details" className="font-medium hover:underline">
+          Detailed numbers →
+        </Link>
+        <Link href="/reports" className="hover:underline">
+          Past weekly reports
+        </Link>
+        <Link href="/methodology" className="hover:underline">
+          How we calculate
+        </Link>
+      </nav>
+    </div>
   );
 }
 
-function DashboardSkeleton() {
+function HomeSkeleton() {
   return (
-    <div className="space-y-4" aria-busy="true" aria-label="Loading dashboard">
-      <Skeleton className="h-28 w-full rounded-xl" />
-      <Skeleton className="h-64 w-full rounded-xl" />
-      <div className="grid gap-3 sm:grid-cols-3">
-        <Skeleton className="h-40 rounded-xl" />
-        <Skeleton className="h-40 rounded-xl" />
-        <Skeleton className="h-40 rounded-xl" />
+    <div className="space-y-6" aria-busy="true" aria-label="Loading">
+      <Skeleton className="h-44 w-full rounded-2xl" />
+      <div className="grid gap-4 md:grid-cols-2">
+        {Array.from({ length: 4 }, (_, i) => (
+          <Skeleton key={i} className="h-56 rounded-2xl" />
+        ))}
       </div>
     </div>
   );
