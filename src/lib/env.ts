@@ -42,6 +42,7 @@ export function integrationStatus() {
       "WHATSAPP_TEMPLATE_NAME",
       "WHATSAPP_GRAPH_VERSION",
     ),
+    telegram: has("TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"),
     cron: has("CRON_SECRET"),
     admin: has("ADMIN_PASSWORD"),
   };

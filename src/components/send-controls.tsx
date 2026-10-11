@@ -10,7 +10,7 @@ export function SendControls({ reportId }: { reportId: string }) {
   const [busy, setBusy] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
-  async function send(channel: "email" | "whatsapp") {
+  async function send(channel: "email" | "telegram" | "whatsapp") {
     setBusy(channel);
     setMsg(null);
     try {
@@ -35,6 +35,9 @@ export function SendControls({ reportId }: { reportId: string }) {
       <div className="mt-2 flex flex-wrap gap-2">
         <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => send("email")}>
           {busy === "email" ? "Sending…" : "Send test email"}
+        </Button>
+        <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => send("telegram")}>
+          {busy === "telegram" ? "Sending…" : "Send test Telegram"}
         </Button>
         <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => send("whatsapp")}>
           {busy === "whatsapp" ? "Sending…" : "Send test WhatsApp"}

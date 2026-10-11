@@ -14,7 +14,7 @@ export const maxDuration = 60;
 export const POST = adminRoute(async (req: Request, ctx: RouteContext<"/api/reports/[id]/send">) => {
   const { id } = await ctx.params;
   const body = await readJson<{ channel?: string; test?: boolean; retry?: boolean }>(req);
-  if (body.channel !== "email" && body.channel !== "whatsapp") throw new FundInputError("channel must be email or whatsapp");
+  if (!["email", "telegram", "whatsapp"].includes(body.channel ?? "")) throw new FundInputError("channel must be email, telegram or whatsapp");
   const report = await repo.getReport<ReportPayload, ReportInput>(id);
   if (!report) return json({ error: "Report not found" }, 404);
   const outcome = await deliver(report, body.channel as Channel, { isTest: body.test !== false, retry: Boolean(body.retry) });

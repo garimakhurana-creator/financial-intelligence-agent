@@ -96,7 +96,7 @@ export function renderEmail(report: StoredWeeklyReport, reportUrl: string, opts:
         f.performance,
         f.comparison,
         f.marketContext,
-        WINDOWS.map((w) => `${WINDOW_LABEL[w]}: fund ${pct(perf?.windows[w].fund.returnPct)}, benchmark ${pct(perf?.windows[w].benchmark?.returnPct)}, peers ${pct(perf?.windows[w].peer?.mean)}`).join(" | "),
+        WINDOWS.map((w) => `${WINDOW_LABEL[w]}: fund ${pct(perf?.windows[w]?.fund.returnPct)}, benchmark ${pct(perf?.windows[w]?.benchmark?.returnPct)}, peers ${pct(perf?.windows[w]?.peer?.mean)}`).join(" | "),
         "",
       ];
     }),

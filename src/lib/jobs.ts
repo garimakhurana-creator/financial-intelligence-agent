@@ -2,7 +2,7 @@ import { todayIn } from "@/lib/dates";
 import * as repo from "@/lib/db/repo";
 import { REPORT_TZ } from "@/lib/env";
 import { errorMessage, log } from "@/lib/log";
-import { deliverAll } from "@/lib/delivery/deliver";
+import { deliverAll, syncEmailStatuses } from "@/lib/delivery/deliver";
 import { refreshAllFundNavs, refreshIndices, refreshMarketSnapshot, refreshPeers } from "@/lib/pipeline/data";
 import { createWeeklyReport, weekEndingFor } from "@/lib/report/build";
 
@@ -42,6 +42,7 @@ export async function runDaily(trigger: "cron" | "manual", opts: { force?: boole
     return r;
   }, countOk);
   if (!(await runStep(steps, "market_snapshot", refreshMarketSnapshot, (r: { date: string }) => `as of ${r.date}`))) partial = true;
+  await runStep(steps, "email_status_sync", async () => syncEmailStatuses((await repo.listReports(4)).map((r) => r.id)), (n: number) => `${n} updated`);
   const failed = steps.filter((s) => !s.ok).length;
   const status: repo.RunStatus = failed === steps.length ? "failed" : failed || partial ? "partial" : "succeeded";
   await repo.finishRun(claim.run.id, status, steps);
@@ -97,7 +98,8 @@ export async function runWeekly(trigger: "cron" | "manual", opts: { force?: bool
   if (opts.deliver !== false && report) {
     await runStep(steps, "delivery", async () => {
       const outcomes = await deliverAll(report as never, { isTest: false });
-      if (outcomes.some((o) => o.status === "failed" || o.status === "awaiting_configuration")) partial = true;
+      // A channel that is not configured yet is reported, but only an actual failure makes the run partial.
+      if (outcomes.some((o) => o.status === "failed")) partial = true;
       return outcomes;
     }, (o: { channel: string; status: string; detail?: string }[]) => o.map((x) => `${x.channel}: ${x.status}${x.detail ? ` (${x.detail.slice(0, 120)})` : ""}`).join("; "));
   }

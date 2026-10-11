@@ -111,3 +111,83 @@ export async function sendWhatsApp(report: StoredWeeklyReport, reportUrl: string
   if (!id) throw new Error("WhatsApp API accepted the request but returned no message id");
   return { providerMessageId: id, recipientMasked: maskPhone(env.WHATSAPP_RECIPIENT_NUMBER) };
 }
+
+// ---------------------------------------------------------------------------------------------
+// Telegram (Bot API) — interim messaging channel while WhatsApp Business approval is pending.
+
+const TELEGRAM_LIMIT = 4096;
+
+export function telegramRecipientMasked(): string | null {
+  const id = process.env.TELEGRAM_CHAT_ID?.trim();
+  return id ? `chat ${maskPhone(id)}` : null;
+}
+
+/** Plain-text Telegram message(s); split on fund boundaries to stay under the 4096-char limit. */
+export function renderTelegram(report: StoredWeeklyReport, reportUrl: string, opts: { isTest: boolean }): string[] {
+  const out = report.report.output;
+  const head = [
+    opts.isTest ? "🧪 TEST — not the scheduled Saturday report\n" : "",
+    `📊 Weekly fund report — week ending ${formatHuman(report.weekEnding)}`,
+    "",
+    `Overall: ${out.assessment.label}`,
+    out.assessment.reason,
+  ].join("\n");
+  const funds = out.funds.map((f) => {
+    const name = report.report.funds.find((x) => x.schemeCode === f.schemeCode)?.schemeName.replace(/\s*-\s*Direct Plan.*$/i, "") ?? String(f.schemeCode);
+    return `▪️ ${name}\n${f.performance}\n${f.comparison}\n${f.marketContext}`;
+  });
+  const tail = `🌐 Market: ${out.marketSummary.text}\n\nFull report with sources: ${reportUrl}\n\nNot investment advice. Past performance does not guarantee future returns.`;
+  const messages: string[] = [];
+  let cur = head;
+  for (const block of [...funds, tail]) {
+    if ((cur + "\n\n" + block).length > TELEGRAM_LIMIT) {
+      messages.push(cur);
+      cur = block;
+    } else cur += "\n\n" + block;
+  }
+  messages.push(cur);
+  return messages.map((m) => (m.length > TELEGRAM_LIMIT ? `${m.slice(0, TELEGRAM_LIMIT - 1)}…` : m));
+}
+
+export async function sendTelegram(report: StoredWeeklyReport, reportUrl: string, opts: { isTest: boolean }): Promise<SendResult> {
+  const env = requireEnv(["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"], "Telegram");
+  const ids: string[] = [];
+  for (const text of renderTelegram(report, reportUrl, opts)) {
+    const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text, disable_web_page_preview: true }),
+      signal: AbortSignal.timeout(20_000),
+    });
+    const j = (await res.json().catch(() => ({}))) as { ok?: boolean; result?: { message_id: number }; description?: string };
+    if (!res.ok || !j.ok || !j.result) throw new Error(`Telegram API ${res.status}: ${j.description ?? "request rejected"}`);
+    ids.push(String(j.result.message_id));
+  }
+  return { providerMessageId: ids.join(","), recipientMasked: telegramRecipientMasked() ?? "chat" };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Provider-confirmed email status (Resend). A successful send only means "accepted"; Resend's
+// last_event tells us whether the receiving server took it (delivered) or rejected it (bounced).
+
+const RESEND_EVENT_MAP: Record<string, "delivered" | "read" | "failed" | "sent_to_provider"> = {
+  sent: "sent_to_provider",
+  delivered: "delivered",
+  opened: "read",
+  clicked: "read",
+  bounced: "failed",
+  complained: "failed",
+  delivery_delayed: "sent_to_provider",
+};
+
+export async function fetchEmailStatus(providerMessageId: string): Promise<{ status: "delivered" | "read" | "failed" | "sent_to_provider" | null; event: string | null }> {
+  const key = process.env.RESEND_API_KEY?.trim();
+  if (!key) return { status: null, event: null };
+  const res = await fetch(`https://api.resend.com/emails/${encodeURIComponent(providerMessageId)}`, {
+    headers: { Authorization: `Bearer ${key}` },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) return { status: null, event: null };
+  const j = (await res.json()) as { last_event?: string };
+  return { status: j.last_event ? (RESEND_EVENT_MAP[j.last_event] ?? null) : null, event: j.last_event ?? null };
+}

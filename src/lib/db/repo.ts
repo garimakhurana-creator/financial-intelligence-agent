@@ -403,7 +403,7 @@ export type DeliveryStatus = "pending" | "sent_to_provider" | "delivered" | "rea
 export interface DeliveryLog {
   id: string;
   reportId: string;
-  channel: "email" | "whatsapp";
+  channel: "email" | "whatsapp" | "telegram";
   isTest: boolean;
   status: DeliveryStatus;
   recipientMasked: string | null;

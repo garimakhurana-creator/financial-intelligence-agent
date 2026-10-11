@@ -3,6 +3,7 @@ import { INDICES, VIEWS, type IndexId, type ViewId } from "@/lib/catalog";
 import { todayIn } from "@/lib/dates";
 import * as repo from "@/lib/db/repo";
 import { integrationStatus, REPORT_TZ } from "@/lib/env";
+import { syncEmailStatuses } from "@/lib/delivery/deliver";
 import { buildFundPerformance, buildIndexPerformance, buildIndexSet, getIndexSeries, historyStart, type FundPerformance, type StoredPeerStats } from "@/lib/pipeline/data";
 import type { ReportPayload, StoredWeeklyReport } from "@/lib/report/build";
 import type { ReportInput } from "@/lib/report/types";
@@ -62,7 +63,12 @@ export async function loadReport(id: string): Promise<{ report: StoredWeeklyRepo
   await connection();
   const report = await repo.getReport<ReportPayload, ReportInput>(id);
   if (!report) return null;
-  return { report, deliveries: await repo.listDeliveries(id) };
+  let deliveries = await repo.listDeliveries(id);
+  // Ask Resend for confirmed status only when an email is still "accepted, not confirmed".
+  if (deliveries.some((d) => d.channel === "email" && d.status === "sent_to_provider")) {
+    if ((await syncEmailStatuses([id]).catch(() => 0)) > 0) deliveries = await repo.listDeliveries(id);
+  }
+  return { report, deliveries };
 }
 
 export async function loadArchive() {
