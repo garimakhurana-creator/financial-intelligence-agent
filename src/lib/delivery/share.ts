@@ -5,7 +5,11 @@ import type { StoredWeeklyReport } from "@/lib/report/build";
 // it opens WhatsApp with the summary pre-filled and the user presses Send. Automated WhatsApp
 // delivery uses the official Business Cloud API (channels.ts) once Meta approves the template.
 
-const fmt = (n: number | null | undefined) => (n === null || n === undefined ? "n/a" : `${n > 0 ? "+" : ""}${n.toFixed(2)}%`);
+const fmt = (n: number | null | undefined) => {
+  if (n === null || n === undefined) return "n/a";
+  const r = Math.round(n * 100) / 100;
+  return `${r > 0 ? "+" : ""}${(r === 0 ? 0 : r).toFixed(2)}%`;
+};
 
 export function whatsappShareText(report: StoredWeeklyReport, reportUrl: string): string {
   const out = report.report.output;
