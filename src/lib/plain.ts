@@ -103,8 +103,8 @@ export function describeVsPeers(pp: number | null | undefined): { words: string;
 }
 
 /** The week's assessment as weather. */
-export const WEEK_WEATHER: Record<string, { emoji: string; title: string; line: string; from: string; to: string }> = {
-  "No action needed": { emoji: "☀️", title: "Calm week", line: "Nothing needs you. Your funds are moving in step with their markets — up or down, that is normal.", from: "#fde68a", to: "#fca5a5" },
-  "One fund worth watching": { emoji: "🌤️", title: "One to keep an eye on", line: "Mostly fine — one fund has been behind similar funds for a while. No rush.", from: "#bae6fd", to: "#c4b5fd" },
-  "Consider reviewing your allocation": { emoji: "🌧️", title: "Time for a check-in", line: "A few funds have been behind similar funds for a while. Worth a calm look this weekend.", from: "#cbd5e1", to: "#a5b4fc" },
+export const WEEK_WEATHER: Record<string, { emoji: string; title: string; from: string; to: string }> = {
+  "No action needed": { emoji: "☀️", title: "No action needed", from: "#fde68a", to: "#fca5a5" },
+  "One fund worth watching": { emoji: "🌤️", title: "One fund worth watching", from: "#bae6fd", to: "#c4b5fd" },
+  "Consider reviewing your allocation": { emoji: "🌧️", title: "Consider reviewing your allocation", from: "#cbd5e1", to: "#a5b4fc" },
 };

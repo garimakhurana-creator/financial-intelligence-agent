@@ -130,9 +130,6 @@ export function renderTelegram(report: StoredWeeklyReport, reportUrl: string, op
   const head = [
     opts.isTest ? "🧪 TEST — not the scheduled Saturday report\n" : "",
     `📊 Weekly fund report — week ending ${formatHuman(report.weekEnding)}`,
-    "",
-    `Overall: ${out.assessment.label}`,
-    out.assessment.reason,
   ].join("\n");
   const funds = out.funds.map((f) => {
     const name = report.report.funds.find((x) => x.schemeCode === f.schemeCode)?.schemeName.replace(/\s*-\s*Direct Plan.*$/i, "") ?? String(f.schemeCode);
@@ -141,7 +138,7 @@ export function renderTelegram(report: StoredWeeklyReport, reportUrl: string, op
   // Private chat, so the owner's own number is fine here (never shown on public pages).
   const waNum = process.env.WHATSAPP_SHARE_NUMBER?.trim();
   const wa = waNum ? `\n\nSave to WhatsApp (one tap, then Send): ${whatsappShareLink(whatsappShareText(report, reportUrl), waNum)}` : "";
-  const tail = `🌐 Market: ${out.marketSummary.text}\n\nFull report with sources: ${reportUrl}${wa}\n\nNot investment advice. Past performance does not guarantee future returns.`;
+  const tail = `🌐 Market: ${out.marketSummary.text}\n\n✅ Overall assessment: ${out.assessment.label}\n${out.assessment.reason}\n\nFull report with sources: ${reportUrl}${wa}\n\nNot investment advice. Past performance does not guarantee future returns.`;
   const messages: string[] = [];
   let cur = head;
   for (const block of [...funds, tail]) {

@@ -15,10 +15,11 @@ export function whatsappShareText(report: StoredWeeklyReport, reportUrl: string)
   });
   return [
     `*Weekly fund report — week ending ${formatHuman(report.weekEnding)}*`,
-    `Overall: *${out.assessment.label}*`,
-    out.assessment.reason,
     "",
     ...lines,
+    "",
+    `Overall: *${out.assessment.label}*`,
+    out.assessment.reason,
     "",
     `Full report with sources: ${reportUrl}`,
   ].join("\n");

@@ -6,7 +6,7 @@ export const MAX_SENTENCE_WORDS = 50;
 
 /** Analyst words kept out of the headline reason Meera reads first. */
 export const JARGON_RE = /\b(benchmarks?|peers?|peer group|underperform\w*|outperform\w*|YTD|basis points|allocation|volatility)\b/i;
-export const MAX_REASON_WORDS = 45;
+export const MAX_REASON_WORDS = 65;
 
 /**
  * Phrases that would turn a monitoring report into a trade instruction. "guarantee" is only

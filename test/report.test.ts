@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { VIEW_IDS } from "@/lib/catalog";
 import { fallbackReport } from "@/lib/report/fallback";
 import { generateNarrative } from "@/lib/report/generate";
-import { screenFund, suggestLabel } from "@/lib/report/screening";
+import { portfolioNotes, screenFund, suggestLabel } from "@/lib/report/screening";
 import type { MetricTriple, ReportInput, ReportOutput } from "@/lib/report/types";
 import { countSentences, validateReport } from "@/lib/report/validate";
 
@@ -212,5 +212,50 @@ describe("hasAdvice", () => {
     const allowed = allowedNumbers({ nav: 88.9258 });
     expect(isAllowedNumber({ value: 88.9258, decimals: 4 }, allowed)).toBe(true);
     expect(isAllowedNumber({ value: 88.9259, decimals: 4 }, allowed)).toBe(false);
+  });
+});
+
+describe("assessment reason never hides a fall (screen-v2)", () => {
+  const fund = (name: string, view: "mid_cap" | "small_cap" | "large_cap_index", m: [number, number, number | null], y: [number, number]) => {
+    const returns = { "1W": triple(0.2, 0.1), "1M": triple(m[0], m[1], m[2]), YTD: triple(y[0], y[1]) };
+    return { name, view, returns, screening: screenFund(view, returns) };
+  };
+
+  it("keeps 'No action needed' when funds fall with their market, but says so with the numbers", () => {
+    const funds = [fund("HDFC Mid Cap Fund", "mid_cap", [-5.36, -5.42, -6.04], [-2.19, 1.78]), fund("Nippon India Small Cap Fund", "small_cap", [-3.66, -3.94, -4.65], [8.17, 11.76])];
+    const notes = portfolioNotes(funds);
+    expect(notes.marketDip.map((d) => d.name)).toEqual(["HDFC Mid Cap Fund", "Nippon India Small Cap Fund"]);
+    expect(notes.yearLag.map((l) => l.name)).toEqual(["HDFC Mid Cap Fund", "Nippon India Small Cap Fund"]);
+    const s = suggestLabel([], notes);
+    expect(s.label).toBe("No action needed");
+    expect(s.rationale).toMatch(/fell 3\.66%–5\.36% this month/);
+    expect(s.rationale).toMatch(/market-wide dip/);
+    expect(s.rationale).toMatch(/behind similar funds this year/);
+  });
+
+  it("does not call a fall market-wide when the market rose", () => {
+    const notes = portfolioNotes([fund("A Fund", "mid_cap", [-3, 1, 1], [0, 0])]);
+    expect(notes.marketDip).toEqual([]);
+  });
+
+  it("says 'Nothing to do' only when there is nothing to report", () => {
+    expect(suggestLabel([], { marketDip: [], yearLag: [] }).rationale).toMatch(/Nothing to do\.$/);
+  });
+
+  it("keeps the fallback reason jargon-free and within the word limit", async () => {
+    const { JARGON_RE, MAX_REASON_WORDS } = await import("@/lib/report/validate");
+    const s = suggestLabel([], {
+      marketDip: [
+        { name: "A Fund", fund: -5.36, market: -6.04 },
+        { name: "B Fund", fund: -3.66, market: -4.65 },
+        { name: "C Fund", fund: -3.91, market: -3.89 },
+      ],
+      yearLag: [
+        { name: "A Fund", vsPeers: -3.97 },
+        { name: "B Fund", vsPeers: -3.59 },
+      ],
+    });
+    expect(JARGON_RE.test(s.rationale)).toBe(false);
+    expect(s.rationale.split(/\s+/).length).toBeLessThanOrEqual(MAX_REASON_WORDS);
   });
 });

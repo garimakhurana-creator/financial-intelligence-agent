@@ -4,7 +4,7 @@ import type { ISODate } from "@/lib/dates";
 import type { NewsItem } from "@/lib/db/repo";
 import type { FundPerformance, IndexPerformance } from "@/lib/pipeline/data";
 import type { IndexSnapshot } from "@/lib/sources/nse";
-import { screenFund, suggestLabel } from "@/lib/report/screening";
+import { portfolioNotes, screenFund, suggestLabel } from "@/lib/report/screening";
 import { REPORT_SCHEMA_VERSION, type FundInput, type ReportInput } from "@/lib/report/types";
 
 const shortName = (n: string) => n.replace(/\s*-\s*Direct Plan.*$/i, "").replace(/\s*-\s*Growth.*$/i, "").trim();
@@ -53,7 +53,8 @@ export function buildReportInput(args: {
   });
 
   const flagged = funds.filter((f) => f.screening.flag).map((f) => ({ name: f.name, reason: f.screening.reason }));
-  const s = suggestLabel(flagged);
+  const notes = portfolioNotes(funds);
+  const s = suggestLabel(flagged, notes);
 
   const news = args.news.map((n, i) => ({
     id: `N${i + 1}`,
@@ -93,6 +94,6 @@ export function buildReportInput(args: {
       fundCodes: funds.filter((f) => f.view === id).map((f) => f.schemeCode),
       indexIds: VIEWS[id].marketIndices,
     })),
-    screening: { suggestedLabel: s.label, rationale: s.rationale },
+    screening: { suggestedLabel: s.label, rationale: s.rationale, notes },
   };
 }

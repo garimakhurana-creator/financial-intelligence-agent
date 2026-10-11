@@ -65,15 +65,16 @@ export function renderEmail(report: StoredWeeklyReport, reportUrl: string, opts:
     ${opts.isTest ? `<div style="background:#fff4d6;border:1px solid #f0d58a;padding:8px 12px;border-radius:8px;font-size:13px;margin-bottom:12px">Test send — not the scheduled Saturday report.</div>` : ""}
     <div style="font-size:13px;color:#777">Weekly fund report · week ending ${week}</div>
     <h1 style="font-size:22px;margin:6px 0 16px">Hi ${esc(report.inputSnapshot.investorName)}, here is your week.</h1>
-    <div style="background:#fff;border-left:4px solid ${color};border-radius:8px;padding:14px 16px;margin-bottom:18px">
-      <div style="font-size:18px;font-weight:700;color:${color}">${esc(out.assessment.label)}</div>
-      <p style="margin:6px 0 0;line-height:1.5">${esc(out.assessment.reason)}</p>
-    </div>
     <h2 style="font-size:16px;margin:0 0 10px">Your funds</h2>
     ${fundBlocks}
     <h2 style="font-size:16px;margin:18px 0 8px">The market this week</h2>
     <p style="line-height:1.5;margin:0 0 12px">${esc(out.marketSummary.text)}</p>
     <ul style="padding-left:18px;margin:0 0 18px;line-height:1.5">${categories}</ul>
+    <h2 style="font-size:16px;margin:18px 0 8px">Overall assessment</h2>
+    <div style="background:#fff;border-left:4px solid ${color};border-radius:8px;padding:14px 16px;margin-bottom:18px">
+      <div style="font-size:18px;font-weight:700;color:${color}">${esc(out.assessment.label)}</div>
+      <p style="margin:6px 0 0;line-height:1.5">${esc(out.assessment.reason)}</p>
+    </div>
     <a href="${esc(reportUrl)}" style="display:inline-block;background:#1a1a1a;color:#fff;text-decoration:none;padding:10px 16px;border-radius:8px;font-weight:600">Read the full report with sources</a>
     <p style="font-size:11px;color:#888;line-height:1.5;margin-top:22px">
       Returns are point-to-point from published NAVs (${esc(p.meta.generator === "gemini" ? `summary written by ${p.meta.model}` : "automated summary")}).
@@ -85,9 +86,6 @@ export function renderEmail(report: StoredWeeklyReport, reportUrl: string, opts:
   const text = [
     opts.isTest ? "[TEST SEND — not the scheduled report]\n" : "",
     `Weekly fund report — week ending ${week}`,
-    "",
-    `OVERALL: ${out.assessment.label}`,
-    out.assessment.reason,
     "",
     ...out.funds.flatMap((f) => {
       const perf = p.funds.find((x) => x.schemeCode === f.schemeCode);
@@ -102,6 +100,9 @@ export function renderEmail(report: StoredWeeklyReport, reportUrl: string, opts:
     }),
     "MARKET",
     out.marketSummary.text,
+    "",
+    `OVERALL ASSESSMENT: ${out.assessment.label}`,
+    out.assessment.reason,
     "",
     `Full report with sources: ${reportUrl}`,
     "",

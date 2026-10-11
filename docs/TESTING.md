@@ -14,7 +14,7 @@ npx tsx --env-file=.env.local scripts/smoke-sources.ts   # live check of every d
 
 | Check | Result |
 |---|---|
-| `npm test` | **84 passed / 84** (10 files) |
+| `npm test` | **88 passed / 88** (10 files) |
 | `npm run typecheck` | 0 errors |
 | `npm run lint` | 0 errors, 0 warnings |
 | `npm run build` | succeeded — 36 routes; pages partially prerendered, data streamed at request time |

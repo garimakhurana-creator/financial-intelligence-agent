@@ -1,7 +1,7 @@
 # Calculation Methodology
 
 Code: `src/lib/calc/returns.ts` (`CALC_VERSION = returns-v1`), `src/lib/calc/peers.ts` (`peers-v1`),
-`src/lib/report/screening.ts` (`screen-v1`). All dates are calendar dates (`YYYY-MM-DD`) in IST.
+`src/lib/report/screening.ts` (`screen-v2`). All dates are calendar dates (`YYYY-MM-DD`) in IST.
 
 ## Point-to-point return
 
@@ -73,6 +73,18 @@ Live counts on 2026-10-09: Nifty 50 index funds 23, Mid Cap 33, Small Cap 36, Sh
 0 flagged → *No action needed*; 1 → *One fund worth watching*; ≥2 → *Consider reviewing your allocation*.
 Requiring two windows prevents a single bad week from triggering a label. Gemini receives this suggestion and
 must give a specific, evidence-based reason; the validator enforces label/fund consistency.
+
+**The label answers "is something wrong with a fund?", not "did my money go down?"** — the brief's question is
+whether a fall is "a broad market event or fund-specific". A fund that falls with its market is not flagged. So that
+"No action needed" never reads as "nothing happened", screen-v2 adds two notes the reason must mention:
+
+| Note | Rule | Example wording |
+|---|---|---|
+| Market-wide dip | unflagged fund with 1M return ≤ −2% while its index (or similar funds) also fell over 1M | "3 funds fell 3.66%–5.36% this month, but their markets fell about as much (3.89%–6.04%): a market-wide dip, not a fund problem." |
+| Longer-term lag | unflagged non-index fund behind similar funds this year by the flag threshold (−3 pp equity, −0.75 pp debt) | "HDFC Mid Cap and Nippon India Small Cap are still behind similar funds this year (by 3.97 and 3.59 points)." |
+
+The assessment closes the report (email, Telegram, web report), after the three sentences per fund and the market
+summary, as the brief specifies.
 
 ## Known limitations
 

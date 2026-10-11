@@ -6,12 +6,14 @@ import { cn } from "@/lib/utils";
 
 export type ThemePref = "light" | "dark" | "system";
 const KEY = "theme";
+/** Dark unless the viewer picks Light or System in the sidebar. */
+export const DEFAULT_THEME: ThemePref = "dark";
 
 /**
  * Runs in <head> before first paint so the page never flashes the wrong theme.
  * Kept as a string because it must execute before React loads.
  */
-export const THEME_SCRIPT = `(function(){try{var p=localStorage.getItem("${KEY}")||"system";var d=p==="dark"||(p==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.setAttribute("data-theme",d?"dark":"light");}catch(e){document.documentElement.setAttribute("data-theme","light");}})();`;
+export const THEME_SCRIPT = `(function(){try{var p=localStorage.getItem("${KEY}")||"dark";var d=p==="dark"||(p==="system"&&window.matchMedia("(prefers-color-scheme: dark)").matches);document.documentElement.setAttribute("data-theme",d?"dark":"light");}catch(e){document.documentElement.setAttribute("data-theme","dark");}})();`;
 
 function apply(pref: ThemePref) {
   const dark = pref === "dark" || (pref === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
@@ -21,9 +23,9 @@ function apply(pref: ThemePref) {
 function readPref(): ThemePref {
   try {
     const v = localStorage.getItem(KEY);
-    return v === "light" || v === "dark" ? v : "system";
+    return v === "light" || v === "dark" || v === "system" ? v : DEFAULT_THEME;
   } catch {
-    return "system";
+    return DEFAULT_THEME;
   }
 }
 
@@ -39,7 +41,7 @@ function subscribe(cb: () => void) {
 
 /** Light / dark / follow-system switch. The choice is remembered in this browser only. */
 export function ThemeToggle({ compact = false }: { compact?: boolean }) {
-  const pref = useSyncExternalStore(subscribe, readPref, () => "system" as ThemePref);
+  const pref = useSyncExternalStore(subscribe, readPref, () => DEFAULT_THEME);
 
   useEffect(() => {
     if (pref !== "system") return;

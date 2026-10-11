@@ -107,12 +107,6 @@ async function Report({
         </h1>
       </div>
 
-      <WeatherHero
-        label={report.assessment}
-        reason={report.assessmentReason}
-        weekEnding={report.weekEnding}
-        reportId={null}
-      />
 
       <div className="flex flex-wrap items-center gap-2 text-sm">
         <a
@@ -301,6 +295,11 @@ async function Report({
             </div>
           ))}
         </div>
+      </section>
+
+      <section>
+        <h2 className="mb-4 text-xl font-bold">Overall assessment</h2>
+        <WeatherHero label={report.assessment} reason={report.assessmentReason} weekEnding={report.weekEnding} reportId={null} />
       </section>
 
       <details className="group rounded-3xl border bg-card shadow-card">

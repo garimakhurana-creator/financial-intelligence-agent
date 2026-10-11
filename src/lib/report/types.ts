@@ -63,7 +63,12 @@ export interface ReportInput {
   breadthDate: ISODate | null;
   news: NewsInput[];
   views: { id: ViewId; title: string; focus: string; fundCodes: number[]; indexIds: string[] }[];
-  screening: { suggestedLabel: AssessmentLabel; rationale: string };
+  screening: {
+    suggestedLabel: AssessmentLabel;
+    rationale: string;
+    /** Facts the reason must mention: market-wide monthly dips and longer-term lags (screen-v2). */
+    notes?: { marketDip: { name: string; fund: number; market: number }[]; yearLag: { name: string; vsPeers: number }[] };
+  };
 }
 
 // ---------------------------------------------------------------------------------------------
