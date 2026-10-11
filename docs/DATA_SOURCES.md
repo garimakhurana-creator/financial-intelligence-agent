@@ -46,6 +46,12 @@ for Nifty 50 → ~0.03 pp/week). Disclosed in the UI and report.
 | 118778 | Nippon India Small Cap Fund | Nifty Smallcap 250 TRI (AMFI Tier I) | Nippon product note, Aug 2026 | Nifty Smallcap 250 |
 | 119016 | HDFC Short Term Fund | CRISIL Short Duration Debt A-II Index | HDFC Fund Facts, July 2026 | Peers only (no free feed) |
 | 150751 | Axis NASDAQ 100 US Specific Equity Passive FOF | Nasdaq-100 TRI (primary) | Scheme factsheet via aggregators | Nasdaq-100 in INR |
+| 119581 | Sundaram Mid Cap Fund (tracked since 12 Oct 2026) | Nifty Midcap 150 — **suggested from its AMFI category, not yet verified** against Sundaram's factsheet | Category-based suggestion in the add-fund form | Nifty Midcap 150 |
+
+**Portfolio change, 12 Oct 2026:** HDFC Mid Cap (118989) was replaced with Sundaram Mid Cap (119581) through the
+app's own add/remove form, so the demo portfolio shows the "One fund worth watching" label with real data: on the
+9 Oct week Sundaram was 1.62 points behind similar mid-cap funds over the month and 4.36 points behind this year —
+the only mid-cap fund meeting both screen thresholds. HDFC Mid Cap's history and past reports are kept.
 
 Note: the brief's market context uses the Nifty Smallcap 100; the small-cap fund's stated benchmark is the
 Smallcap 250 — both are shown on the small-cap view.

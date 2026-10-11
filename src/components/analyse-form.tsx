@@ -6,6 +6,7 @@ import { FileUp, Hash, Loader2, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { FundSearch } from "@/components/fund-search";
 import { cn } from "@/lib/utils";
 
 const MAX_BYTES = 4 * 1024 * 1024;
@@ -28,68 +29,32 @@ async function getJson<T>(url: string): Promise<T> {
 }
 
 function FundPicker({ onPick, label }: { onPick: (r: Resolved) => void; label: string }) {
-  const [q, setQ] = useState("");
-  const [results, setResults] = useState<{ schemeCode: number; schemeName: string }[] | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   return (
     <div className="space-y-2">
-      <form
-        className="flex gap-2"
-        onSubmit={async (e) => {
-          e.preventDefault();
+      <FundSearch
+        label={label}
+        disabled={busy}
+        placeholder="Type a fund name, e.g. Parag Parikh Flexi Cap — or a scheme code"
+        onPick={async (h) => {
           setBusy(true);
           setErr(null);
           try {
-            const r = await getJson<{ results: { schemeCode: number; schemeName: string }[] }>(`/api/funds/search?q=${encodeURIComponent(q.trim())}`);
-            setResults(r.results);
-            if (!r.results.length) setErr("No funds matched. Try fewer words, e.g. the fund house and category.");
+            onPick(await getJson<Resolved>(`/api/funds/lookup?code=${h.schemeCode}`));
           } catch (e) {
-            setErr(e instanceof Error ? e.message : "Search failed");
+            setErr(e instanceof Error ? e.message : "Lookup failed");
           } finally {
             setBusy(false);
           }
         }}
-      >
-        <div className="relative flex-1">
-          <Label htmlFor="an-q" className="sr-only">
-            {label}
-          </Label>
-          <Search className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-muted-foreground" aria-hidden />
-          <Input id="an-q" className="pl-8" placeholder="e.g. Parag Parikh Flexi Cap Direct Growth" value={q} onChange={(e) => setQ(e.target.value)} minLength={3} required />
-        </div>
-        <Button type="submit" variant="outline" disabled={busy}>
-          {busy ? <Loader2 className="size-4 animate-spin" aria-hidden /> : "Search"}
-        </Button>
-      </form>
-      {err && <p className="text-sm text-[var(--down)]">{err}</p>}
-      {results && results.length > 0 && (
-        <ul className="max-h-64 divide-y overflow-y-auto rounded-xl border">
-          {results.map((r) => (
-            <li key={r.schemeCode}>
-              <button
-                type="button"
-                className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-muted/50"
-                onClick={async () => {
-                  setBusy(true);
-                  setErr(null);
-                  try {
-                    onPick(await getJson<Resolved>(`/api/funds/lookup?code=${r.schemeCode}`));
-                    setResults(null);
-                  } catch (e) {
-                    setErr(e instanceof Error ? e.message : "Lookup failed");
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
-              >
-                <span>{r.schemeName}</span>
-                <span className="tabular shrink-0 text-xs text-muted-foreground">{r.schemeCode}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+      />
+      {busy && (
+        <p className="flex items-center gap-2 text-sm text-muted-foreground">
+          <Loader2 className="size-4 animate-spin" aria-hidden /> Loading fund details…
+        </p>
       )}
+      {err && <p className="text-sm text-[var(--down)]">{err}</p>}
     </div>
   );
 }

@@ -71,7 +71,7 @@ export function PortfolioCards({ portfolio, admin, fundsTracked, navDate }: { po
             </p>
           </div>
           {admin && (
-            <Link href="/portfolio#holdings" className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white dark:text-[var(--page)]">
+            <Link href="/portfolio?open=money#money" className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white dark:text-[var(--page)]">
               Add holdings <ArrowRight className="size-4" aria-hidden />
             </Link>
           )}
@@ -315,7 +315,7 @@ export function QuickActions({ reportId }: { reportId: string | null }) {
     { href: reportId ? `/reports/${reportId}` : "/reports", label: "This week's report", Icon: BookOpen },
     { href: "/market", label: "Market news", Icon: Newspaper },
     { href: "/calculator", label: "SIP calculator", Icon: Calculator },
-    { href: "/portfolio#manage", label: "Add a fund", Icon: PlusCircle },
+    { href: "/portfolio?open=manage#manage", label: "Add a fund", Icon: PlusCircle },
   ];
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
