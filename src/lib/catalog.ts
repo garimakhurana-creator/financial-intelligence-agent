@@ -11,7 +11,8 @@ export type IndexId =
   | "SP500"
   | "USDINR"
   | "NASDAQ100_INR"
-  | "SP500_INR";
+  | "SP500_INR"
+  | "NIFTY500";
 
 export interface IndexDef {
   id: IndexId;
@@ -54,6 +55,13 @@ export const INDICES: Record<IndexId, IndexDef> = {
     currency: "INR",
     variant: "price",
     headline: true,
+  },
+  NIFTY500: {
+    id: "NIFTY500",
+    name: "Nifty 500",
+    sources: [{ kind: "yahoo", symbol: "^CRSLDX" }],
+    currency: "INR",
+    variant: "price",
   },
   NIFTY_SMALLCAP250: {
     id: "NIFTY_SMALLCAP250",
@@ -248,7 +256,80 @@ export const PEER_RULES: PeerRule[] = [
     label: "ELSS (tax saver) funds",
     amfiCategories: ["Equity Scheme - ELSS", "Equity Schemes - ELSS- Tax Saver Fund"],
   },
+  { key: "multi_cap", label: "Multi-cap funds", amfiCategories: ["Equity Scheme - Multi Cap Fund", "Equity Schemes - Multi Cap Fund"] },
+  { key: "value", label: "Value funds", amfiCategories: ["Equity Scheme - Value Fund", "Equity Schemes - Value Fund"] },
+  { key: "focused", label: "Focused funds", amfiCategories: ["Equity Scheme - Focused Fund", "Equity Schemes - Focused Fund"] },
+  {
+    key: "aggressive_hybrid",
+    label: "Aggressive hybrid funds",
+    amfiCategories: ["Hybrid Scheme - Aggressive Hybrid Fund", "Hybrid Schemes - Aggressive Hybrid Fund"],
+  },
+  {
+    key: "balanced_advantage",
+    label: "Balanced advantage funds",
+    amfiCategories: ["Hybrid Scheme - Dynamic Asset Allocation or Balanced Advantage", "Hybrid Schemes - Balanced Advantage Fund/ Dynamic Asset Allocation"],
+  },
+  {
+    key: "multi_asset",
+    label: "Multi-asset allocation funds",
+    amfiCategories: ["Hybrid Scheme - Multi Asset Allocation", "Hybrid Schemes - Multi Asset Allocation Fund"],
+  },
+  {
+    key: "corporate_bond",
+    label: "Corporate bond funds",
+    amfiCategories: ["Debt Scheme - Corporate Bond Fund", "Income/Debt Oriented Schemes - Corporate Bond Fund"],
+  },
+  {
+    key: "banking_psu",
+    label: "Banking & PSU debt funds",
+    amfiCategories: ["Debt Scheme - Banking and PSU Fund", "Income/Debt Oriented Schemes - Banking and PSU Debt Fund"],
+  },
+  { key: "gilt", label: "Gilt (government bond) funds", amfiCategories: ["Debt Scheme - Gilt Fund", "Income/Debt Oriented Schemes - Gilt Fund"] },
+  { key: "liquid", label: "Liquid funds", amfiCategories: ["Debt Scheme - Liquid Fund", "Income/Debt Oriented Schemes - Liquid Fund"] },
 ];
+
+// ---------------------------------------------------------------------------------------------
+// Explore Funds: discovery groups. Each is a peer rule plus plain-language metadata. Funds are only
+// ranked within their own group. The reference index is a category-level yardstick, NOT each
+// fund's stated benchmark (which is not available in a free machine-readable feed).
+
+export type AssetClass = "equity" | "hybrid" | "debt" | "international" | "index";
+
+export interface DiscoveryGroup {
+  key: string;
+  assetClass: AssetClass;
+  plain: string;
+  horizon: string;
+  horizonYears: number;
+  riskBand: "Lower" | "Moderate" | "Higher" | "Highest";
+  referenceIndex: IndexId | null;
+}
+
+export const DISCOVERY_GROUPS: DiscoveryGroup[] = [
+  { key: "index_nifty50", assetClass: "index", plain: "Copies the Nifty 50 — India's 50 largest companies — at low cost.", horizon: "5+ years", horizonYears: 5, riskBand: "Higher", referenceIndex: "NIFTY50" },
+  { key: "large_cap", assetClass: "equity", plain: "Actively managed funds investing mostly in India's 100 largest companies.", horizon: "5+ years", horizonYears: 5, riskBand: "Higher", referenceIndex: "NIFTY50" },
+  { key: "flexi_cap", assetClass: "equity", plain: "Managers can move freely between large, mid and small companies.", horizon: "5+ years", horizonYears: 5, riskBand: "Higher", referenceIndex: "NIFTY500" },
+  { key: "multi_cap", assetClass: "equity", plain: "Must hold at least 25% each in large, mid and small companies.", horizon: "5+ years", horizonYears: 5, riskBand: "Higher", referenceIndex: "NIFTY500" },
+  { key: "large_mid_cap", assetClass: "equity", plain: "At least 35% each in large and mid-sized companies.", horizon: "5+ years", horizonYears: 5, riskBand: "Higher", referenceIndex: "NIFTY500" },
+  { key: "mid_cap", assetClass: "equity", plain: "Mid-sized companies: more growth potential, bigger swings.", horizon: "7+ years", horizonYears: 7, riskBand: "Highest", referenceIndex: "NIFTY_MIDCAP150" },
+  { key: "small_cap", assetClass: "equity", plain: "Smaller companies: highest growth potential and the deepest falls.", horizon: "7+ years", horizonYears: 7, riskBand: "Highest", referenceIndex: "NIFTY_SMALLCAP250" },
+  { key: "value", assetClass: "equity", plain: "Buys companies that look cheap relative to their fundamentals.", horizon: "5+ years", horizonYears: 5, riskBand: "Higher", referenceIndex: "NIFTY500" },
+  { key: "focused", assetClass: "equity", plain: "Concentrated: at most 30 stocks, so results depend heavily on the manager.", horizon: "5+ years", horizonYears: 5, riskBand: "Higher", referenceIndex: "NIFTY500" },
+  { key: "elss", assetClass: "equity", plain: "Tax-saving equity funds with a 3-year lock-in.", horizon: "5+ years (3-year lock-in)", horizonYears: 5, riskBand: "Higher", referenceIndex: "NIFTY500" },
+  { key: "aggressive_hybrid", assetClass: "hybrid", plain: "Mostly shares (65–80%) with some bonds to soften falls.", horizon: "3–5 years", horizonYears: 4, riskBand: "Moderate", referenceIndex: null },
+  { key: "balanced_advantage", assetClass: "hybrid", plain: "Shifts between shares and bonds depending on market valuations.", horizon: "3–5 years", horizonYears: 4, riskBand: "Moderate", referenceIndex: null },
+  { key: "multi_asset", assetClass: "hybrid", plain: "Spreads money across shares, bonds and gold or other assets.", horizon: "3–5 years", horizonYears: 4, riskBand: "Moderate", referenceIndex: null },
+  { key: "fof_overseas", assetClass: "international", plain: "Invests abroad (mostly the US) through other funds; returns also move with the rupee.", horizon: "5+ years", horizonYears: 5, riskBand: "Higher", referenceIndex: null },
+  { key: "short_duration", assetClass: "debt", plain: "Lends for about 1–3 years: steadier, moves with interest rates.", horizon: "1–3 years", horizonYears: 2, riskBand: "Lower", referenceIndex: null },
+  { key: "corporate_bond", assetClass: "debt", plain: "Lends mainly to highly rated companies.", horizon: "2–4 years", horizonYears: 3, riskBand: "Lower", referenceIndex: null },
+  { key: "banking_psu", assetClass: "debt", plain: "Lends to banks and government-owned companies.", horizon: "2–4 years", horizonYears: 3, riskBand: "Lower", referenceIndex: null },
+  { key: "gilt", assetClass: "debt", plain: "Government bonds: almost no default risk, but sensitive to interest-rate moves.", horizon: "3+ years", horizonYears: 3, riskBand: "Moderate", referenceIndex: null },
+  { key: "liquid", assetClass: "debt", plain: "Very short-term lending; a parking place for money needed soon.", horizon: "Days to months", horizonYears: 0.5, riskBand: "Lower", referenceIndex: null },
+];
+
+export function discoveryGroup(key: string | null | undefined): DiscoveryGroup | undefined {
+  return DISCOVERY_GROUPS.find((g) => g.key === key);
+}
 
 /** Peer universes larger than this are not computed (too broad to be a meaningful peer group). */
 export const MAX_PEER_UNIVERSE = 80;

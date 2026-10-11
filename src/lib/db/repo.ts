@@ -573,3 +573,58 @@ export async function listRuns(limit = 20): Promise<RunRecord[]> {
   const page = await db.listRows({ databaseId, tableId: "scheduled_runs", queries: [Query.orderDesc("started_at"), Query.limit(limit)], total: false });
   return page.rows.map(toRun);
 }
+
+// ---------------------------------------------------------------------------------------------
+// Market & News topics (schema v2: market_news.topics, market_news.relevance)
+
+export interface TopicNewsRow extends NewsItem {
+  id: string;
+  topics: string[];
+  relevance: { why: string; fact: string } | null;
+}
+
+/** Upsert topic news. Relevance (Gemini interpretation) is stored as JSON in its own column. */
+export async function saveTopicNews(weekOf: ISODate, items: (NewsItem & { id: string; topics: string[]; relevance?: { why: string; fact: string } | null })[]) {
+  const retrieved_at = nowIso();
+  await upsertMany(
+    "market_news",
+    items.map((n) => ({
+      $id: n.id,
+      url: n.url,
+      title: n.title.slice(0, 500),
+      publisher: n.publisher.slice(0, 128),
+      published_at: n.publishedAt,
+      summary: n.summary.slice(0, 4000),
+      views: n.views,
+      topics: n.topics,
+      relevance: n.relevance ? JSON.stringify(n.relevance) : null,
+      provider: n.provider,
+      week_of: weekOf,
+      retrieved_at,
+    })),
+  );
+}
+
+export async function listNewsSince(since: string, max = 400): Promise<TopicNewsRow[]> {
+  const rows = await listAll("market_news", [Query.greaterThanEqual("published_at", since), Query.orderDesc("published_at")], max);
+  return rows.map((r) => {
+    let relevance: TopicNewsRow["relevance"] = null;
+    try {
+      relevance = r.relevance ? JSON.parse(r.relevance) : null;
+    } catch {
+      relevance = null;
+    }
+    return {
+      id: r.$id,
+      url: r.url,
+      title: r.title,
+      publisher: r.publisher ?? "",
+      publishedAt: r.published_at ?? null,
+      summary: r.summary ?? "",
+      views: r.views ?? [],
+      provider: r.provider ?? "",
+      topics: r.topics ?? [],
+      relevance,
+    };
+  });
+}

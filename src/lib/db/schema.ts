@@ -2,7 +2,9 @@
 // Bump SCHEMA_VERSION whenever a table/column/index is added; the setup script is additive and
 // idempotent (it creates what is missing and never drops data).
 
-export const SCHEMA_VERSION = 1;
+// v2 (2026-10-11): fund_metrics, discovery_groups, watchlist, holdings, preferences, fund_analyses,
+// market_briefs; market_news.topics + market_news.relevance.
+export const SCHEMA_VERSION = 2;
 
 export type ColumnType = "varchar" | "text" | "longtext" | "integer" | "double" | "boolean" | "datetime";
 
@@ -102,6 +104,8 @@ export const TABLES = {
       c("summary", "text"),
       v("views", 32, false, true),
       v("provider", 16),
+      v("topics", 32, false, true),
+      c("relevance", "text"),
       v("week_of", 10, true),
       c("retrieved_at", "datetime"),
     ],
@@ -161,6 +165,86 @@ export const TABLES = {
       c("error", "text"),
     ],
     indexes: [{ key: "idx_started", type: "key", columns: ["started_at"], orders: ["DESC"] }],
+  },
+  fund_metrics: {
+    id: "fund_metrics",
+    name: "Explore Funds metrics",
+    columns: [
+      c("scheme_code", "integer", true),
+      v("scheme_name", 255, true),
+      v("amc", 128),
+      v("group_key", 32, true),
+      v("plan", 24),
+      v("option", 32),
+      c("nav", "double"),
+      v("nav_date", 10),
+      c("score", "double"),
+      v("label", 40),
+      c("data", "longtext", true),
+      c("computed_at", "datetime", true),
+    ],
+    indexes: [
+      { key: "idx_group", type: "key", columns: ["group_key"] },
+      { key: "idx_score", type: "key", columns: ["score"], orders: ["DESC"] },
+    ],
+  },
+  discovery_groups: {
+    id: "discovery_groups",
+    name: "Explore Funds category summaries",
+    columns: [v("group_key", 32, true), c("data", "longtext", true), c("computed_at", "datetime", true)],
+    indexes: [],
+  },
+  watchlist: {
+    id: "watchlist",
+    name: "Research watchlist (not holdings)",
+    columns: [
+      c("scheme_code", "integer", true),
+      v("scheme_name", 255, true),
+      v("group_key", 32),
+      c("note", "text"),
+      v("source", 16),
+      c("added_at", "datetime", true),
+    ],
+    indexes: [],
+  },
+  holdings: {
+    id: "holdings",
+    name: "Holdings and SIPs entered by the owner",
+    columns: [
+      c("scheme_code", "integer", true),
+      c("units", "double"),
+      c("invested", "double"),
+      c("sip_amount", "double"),
+      c("sip_day", "integer"),
+      v("start_date", 10),
+      c("updated_at", "datetime", true),
+    ],
+    indexes: [],
+  },
+  preferences: {
+    id: "preferences",
+    name: "Owner preferences",
+    columns: [c("data", "longtext", true), c("updated_at", "datetime", true)],
+    indexes: [],
+  },
+  fund_analyses: {
+    id: "fund_analyses",
+    name: "Saved fund analyses",
+    columns: [
+      c("scheme_code", "integer"),
+      v("scheme_name", 255, true),
+      v("source_type", 16, true),
+      v("outcome", 48),
+      c("data", "longtext", true),
+      c("created_at", "datetime", true),
+    ],
+    indexes: [{ key: "idx_created", type: "key", columns: ["created_at"], orders: ["DESC"] }],
+  },
+  market_briefs: {
+    id: "market_briefs",
+    name: "Daily market narratives",
+    columns: [v("date", 10, true), c("data", "longtext", true), v("generator", 16), v("model", 64), c("created_at", "datetime", true)],
+    indexes: [{ key: "idx_date", type: "key", columns: ["date"], orders: ["DESC"] }],
   },
 } satisfies Record<string, TableDef>;
 

@@ -28,7 +28,7 @@ const CREDIBILITY: Record<string, number> = {
   "morningstar.in": 6,
 };
 
-const BLOCKED = /(youtube\.com|facebook\.com|twitter\.com|x\.com|instagram\.com|reddit\.com|quora\.com|pinterest\.)/i;
+export const BLOCKED = /(youtube\.com|facebook\.com|twitter\.com|x\.com|instagram\.com|reddit\.com|quora\.com|pinterest\.)/i;
 
 export function hostOf(url: string): string | null {
   try {
@@ -40,7 +40,7 @@ export function hostOf(url: string): string | null {
   }
 }
 
-function credibility(host: string): number {
+export function credibility(host: string): number {
   for (const [d, s] of Object.entries(CREDIBILITY)) if (host === d || host.endsWith(`.${d}`)) return s;
   return 0;
 }
@@ -52,13 +52,13 @@ export function canonicalUrl(url: string): string {
   return `${u.protocol}//${u.hostname.replace(/^www\./, "")}${u.pathname.replace(/\/$/, "")}${u.search}`;
 }
 
-function titleKey(title: string): string {
+export function titleKey(title: string): string {
   return title.toLowerCase().replace(/[^a-z0-9 ]/g, " ").split(/\s+/).filter((w) => w.length > 3).slice(0, 8).join(" ");
 }
 
 export const newsId = (url: string) => createHash("sha1").update(canonicalUrl(url)).digest("hex").slice(0, 32);
 
-interface RawArticle {
+export interface RawArticle {
   url: string;
   title: string;
   publisher?: string;
@@ -72,7 +72,7 @@ const Tavily = z.object({
   results: z.array(z.object({ url: z.string(), title: z.string(), content: z.string().optional(), published_date: z.string().optional().nullable() })),
 });
 
-async function tavilySearch(query: string, view: ViewId): Promise<RawArticle[]> {
+export async function tavilySearch(query: string, view: ViewId): Promise<RawArticle[]> {
   const key = process.env.TAVILY_API_KEY;
   if (!key) return [];
   const raw = await fetchJson<unknown>("https://api.tavily.com/search", {
@@ -106,7 +106,7 @@ const GNews = z.object({
   ),
 });
 
-async function gnewsSearch(query: string, view: ViewId, from: ISODate): Promise<RawArticle[]> {
+export async function gnewsSearch(query: string, view: ViewId, from: ISODate): Promise<RawArticle[]> {
   const key = process.env.GNEWS_API_KEY;
   if (!key) return [];
   const url =
@@ -126,7 +126,7 @@ async function gnewsSearch(query: string, view: ViewId, from: ISODate): Promise<
   }));
 }
 
-const strip = (s: string) => s.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+export const strip = (s: string) => s.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 
 /**
  * Validate, de-duplicate and rank raw articles. Keeps only http(s) links published inside the

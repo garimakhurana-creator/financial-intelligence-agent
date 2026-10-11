@@ -9,7 +9,7 @@ export const JARGON_RE = /\b(benchmarks?|peers?|peer group|underperform\w*|outpe
 export const MAX_REASON_WORDS = 45;
 
 /** Phrases that would turn a monitoring report into a trade instruction. */
-const ADVICE_RE = /\b(buy|sell|redeem|exit (?:the|this) fund|switch (?:out|to)|book profits?|stop (?:your|the) sip|increase (?:your|the) sip|invest more|guarantee[ds]?)\b/i;
+export const ADVICE_RE = /\b(buy|sell|redeem|exit (?:the|this) fund|switch (?:out|to)|book profits?|stop (?:your|the) sip|increase (?:your|the) sip|invest more|guarantee[ds]?)\b/i;
 
 /**
  * Count sentences. Decimal points ("0.43%") and common abbreviations are protected so they do not
@@ -40,7 +40,7 @@ export function numbersIn(text: string): number[] {
 }
 
 /** Every number the model is allowed to state: anything in the input snapshot, plus 1-dp roundings. */
-export function allowedNumbers(input: ReportInput): Set<string> {
+export function allowedNumbers(input: unknown): Set<string> {
   const allowed = new Set<string>();
   const add = (n: number) => {
     const a = Math.abs(n);
@@ -62,7 +62,7 @@ export function allowedNumbers(input: ReportInput): Set<string> {
  * A stated number is allowed if it equals an input number at the precision it was written:
  * "0.43" must match an input value that rounds to 0.43; "0.4" may be a 1-dp rounding of one.
  */
-function isAllowedNumber(t: { value: number; decimals: number }, allowed: Set<string>): boolean {
+export function isAllowedNumber(t: { value: number; decimals: number }, allowed: Set<string>): boolean {
   // Small integers (counts, days, "1 month") and calendar years are always fine.
   if (t.decimals === 0 && (t.value <= 31 || (t.value >= 1990 && t.value <= 2100))) return true;
   if (t.decimals > 2) return allowed.has(t.value.toFixed(2)) && Number(t.value.toFixed(2)) === t.value;

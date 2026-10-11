@@ -16,6 +16,8 @@ export interface AmfiScheme {
   category: string;
   /** "Open Ended Schemes" / "Close Ended Schemes" / "Interval Fund Schemes" */
   structure: string;
+  /** Fund house, from the AMC name line that precedes its schemes. */
+  amc: string;
 }
 
 const HEADER_RE = /^(Open Ended Schemes|Close Ended Schemes|Interval Fund Schemes)\((.*)\)\s*$/;
@@ -24,12 +26,13 @@ const HEADER_RE = /^(Open Ended Schemes|Close Ended Schemes|Interval Fund Scheme
  * Parse AMFI's semicolon-separated file. Columns (current format):
  * Scheme Code;ISIN Div Payout/ ISIN Growth;ISIN Div Reinvestment;Scheme Name;Plan;Option;Net Asset Value;Date
  * Category header lines look like "Open Ended Schemes(Equity Scheme - Mid Cap Fund)".
- * AMC name lines (no semicolons) are skipped.
+ * AMC name lines (no semicolons) set the fund house for the rows that follow.
  */
 export function parseNavAll(text: string): AmfiScheme[] {
   const out: AmfiScheme[] = [];
   let structure = "";
   let category = "";
+  let amc = "";
   for (const raw of text.split(/\r?\n/)) {
     const line = raw.trim();
     if (!line) continue;
@@ -40,6 +43,10 @@ export function parseNavAll(text: string): AmfiScheme[] {
       continue;
     }
     const p = line.split(";");
+    if (p.length === 1) {
+      amc = line;
+      continue;
+    }
     if (p.length < 8 || !/^\d+$/.test(p[0])) continue;
     const nav = Number(p[6]);
     out.push({
@@ -51,6 +58,7 @@ export function parseNavAll(text: string): AmfiScheme[] {
       date: fromDDMonYYYY(p[7]),
       category,
       structure,
+      amc,
     });
   }
   return out;

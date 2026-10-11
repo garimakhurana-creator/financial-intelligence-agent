@@ -5,6 +5,8 @@ import { errorMessage, log } from "@/lib/log";
 import { deliverAll, syncEmailStatuses } from "@/lib/delivery/deliver";
 import { refreshAllFundNavs, refreshIndices, refreshMarketSnapshot, refreshPeers } from "@/lib/pipeline/data";
 import { createWeeklyReport, weekEndingFor } from "@/lib/report/build";
+import { refreshDiscovery } from "@/lib/pipeline/discovery";
+import { refreshMarketNews } from "@/lib/pipeline/news";
 
 type Step = repo.RunRecord["steps"][number];
 
@@ -43,6 +45,13 @@ export async function runDaily(trigger: "cron" | "manual", opts: { force?: boole
   }, countOk);
   if (!(await runStep(steps, "market_snapshot", refreshMarketSnapshot, (r: { date: string }) => `as of ${r.date}`))) partial = true;
   await runStep(steps, "email_status_sync", async () => syncEmailStatuses((await repo.listReports(4)).map((r) => r.id)), (n: number) => `${n} updated`);
+  // Explore Funds metrics/rankings (~20 s) and Market & News with the Gemini brief (~90 s).
+  await runStep(steps, "explore_funds", async () => {
+    const r = await refreshDiscovery(today);
+    if (!allOk(r)) partial = true;
+    return r;
+  }, countOk);
+  await runStep(steps, "market_news", async () => refreshMarketNews(today), (r: { news: number; explained: number; brief: string }) => `${r.news} items, ${r.explained} explained, brief ${r.brief}`);
   const failed = steps.filter((s) => !s.ok).length;
   const status: repo.RunStatus = failed === steps.length ? "failed" : failed || partial ? "partial" : "succeeded";
   await repo.finishRun(claim.run.id, status, steps);
