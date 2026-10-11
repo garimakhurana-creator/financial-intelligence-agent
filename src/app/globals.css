@@ -289,7 +289,7 @@ body {
   }
 }
 .fade-up {
-  animation: fade-up 0.5s ease both;
+  animation: fade-up 0.25s ease-out both;
 }
 .float-slow {
   animation: float-slow 6s ease-in-out infinite;

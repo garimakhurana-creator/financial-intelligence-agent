@@ -6,6 +6,7 @@ import { Suspense, useEffect, useState } from "react";
 import {
   BookA,
   BookOpen,
+  Calculator,
   Compass,
   FileSearch,
   LayoutDashboard,
@@ -31,6 +32,7 @@ export const PRIMARY_NAV = [
   { href: "/explore", label: "Explore Funds", Icon: Compass },
   { href: "/analyse", label: "Analyse a Fund", Icon: FileSearch },
   { href: "/reports", label: "Weekly Reports", Icon: BookOpen },
+  { href: "/calculator", label: "Calculator", Icon: Calculator },
 ] as const;
 
 export const HELP_NAV = [
@@ -153,11 +155,11 @@ function NavShell({ pathname, admin, showAccount = false }: { pathname: string |
         {footer}
       </aside>
 
-      <header className="sticky top-0 z-30 flex items-center justify-between border-b bg-[var(--page)]/90 px-4 py-3 backdrop-blur lg:hidden print:hidden">
-        <Brand />
+      <header className="sticky top-0 z-30 flex items-center gap-2 border-b bg-[var(--page)]/90 px-3 py-3 backdrop-blur lg:hidden print:hidden">
         <button type="button" onClick={() => setOpen(true)} aria-label="Open menu" aria-expanded={open} className="rounded-lg p-2 hover:bg-muted">
           <Menu className="size-5" aria-hidden />
         </button>
+        <Brand />
       </header>
       {open && (
         <div className="fixed inset-0 z-40 lg:hidden" role="dialog" aria-modal="true" aria-label="Menu">

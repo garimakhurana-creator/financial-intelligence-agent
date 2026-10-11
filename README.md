@@ -82,7 +82,10 @@ is available. Every action is rate-limited per IP: 120 writes an hour in general
   refused, and any answer that fails the checks falls back to a safe reply.
 - **Glossary** (`/glossary`): about 50 plain-language terms with examples. Underlined terms across the app show a
   short definition on hover and link to the full entry.
-- **Dark mode**: a Light/Dark/System toggle at the bottom of the sidebar. The choice is remembered on the device and
+- **Calculator** (`/calculator`): monthly SIP, one-time and reach-a-goal maths with a growth chart; rate presets are the tracked funds' real past 3-year averages, labelled as history, not a forecast.
+- **Send to WhatsApp / Download report** (top of the dashboard): a one-tap WhatsApp share of the latest report, and the full report as a PDF (`/api/reports/[id]/pdf`) in the brief's order.
+- **Analyse a Fund** compares any fund with its own AMFI category (same theme or index where the name shows one), computed live, so sector, theme and newer funds get a comparison too; funds under 3 years are judged on their last year.
+- **Dark mode** (the default): a Light/Dark/System toggle at the bottom of the sidebar. The choice is remembered on the device and
   applied before the first paint, so the page does not flash.
 
 ## Documentation

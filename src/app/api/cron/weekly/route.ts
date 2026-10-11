@@ -1,5 +1,7 @@
 import { isCronRequest } from "@/lib/auth";
 import { handle, json } from "@/lib/api";
+import { warmPages } from "@/lib/db/cached";
+import { APP_BASE_URL } from "@/lib/env";
 import { runWeekly } from "@/lib/jobs";
 
 export const maxDuration = 300;
@@ -8,5 +10,9 @@ export const maxDuration = 300;
 // Idempotent per week — a duplicate invocation returns { skipped }.
 export async function GET(req: Request) {
   if (!isCronRequest(req)) return json({ error: "unauthorized" }, 401);
-  return handle(async () => json(await runWeekly("cron")));
+  return handle(async () => {
+    const result = await runWeekly("cron");
+    await warmPages(APP_BASE_URL());
+    return json(result);
+  });
 }

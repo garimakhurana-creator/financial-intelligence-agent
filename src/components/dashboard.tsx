@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, CheckCircle2, Clock, Compass, Eye, FileSearch, Landmark, LineChart, Newspaper, PlusCircle, BookOpen, TrendingDown, TrendingUp } from "lucide-react";
+import { AlertTriangle, ArrowRight, Calculator, CheckCircle2, Clock, Compass, Eye, FileSearch, Landmark, LineChart, Newspaper, PlusCircle, BookOpen, TrendingDown, TrendingUp } from "lucide-react";
 import { Explain } from "@/components/page-header";
 import { VIEWS, type ViewId } from "@/lib/catalog";
 import { formatHuman } from "@/lib/dates";
@@ -314,10 +314,11 @@ export function QuickActions({ reportId }: { reportId: string | null }) {
     { href: "/analyse", label: "Analyse a fund", Icon: FileSearch },
     { href: reportId ? `/reports/${reportId}` : "/reports", label: "This week's report", Icon: BookOpen },
     { href: "/market", label: "Market news", Icon: Newspaper },
+    { href: "/calculator", label: "SIP calculator", Icon: Calculator },
     { href: "/portfolio#manage", label: "Add a fund", Icon: PlusCircle },
   ];
   return (
-    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
       {actions.map((a) => (
         <Link key={a.href + a.label} href={a.href} className="lift flex items-center gap-3 rounded-2xl border bg-card px-3 py-3 text-sm font-medium shadow-card">
           <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand">

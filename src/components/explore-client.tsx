@@ -13,7 +13,6 @@ import { cn } from "@/lib/utils";
 
 const pct = (n: number | null) => (n === null ? "—" : `${n > 0 ? "+" : ""}${n.toFixed(2)}%`);
 const tone = (n: number | null) => (n === null ? "text-muted-foreground" : n > 0.004 ? "text-[var(--up)]" : n < -0.004 ? "text-[var(--down)]" : "");
-const ASSET_LABEL: Record<string, string> = { equity: "Equity", index: "Index (equity)", hybrid: "Hybrid", debt: "Debt", international: "International" };
 const LABEL_TINT: Record<string, string> = {
   "Strong historical consistency": "bg-[var(--tint-good)]",
   "Worth researching": "bg-[var(--tint-good)]",
@@ -101,79 +100,158 @@ function WatchButton({ code, watched, admin }: { code: number; watched: boolean;
 }
 
 // ---------------------------------------------------------------------------------------------
+// Fund card: one headline number, a few friendly facts, details one tap away.
+
+const ASSET_EMOJI: Record<string, string> = { equity: "📈", index: "🧩", hybrid: "⚖️", debt: "🛟", international: "🌎" };
+const ASSET_GRADIENT: Record<string, [string, string]> = {
+  equity: ["#f97316", "#ec4899"],
+  index: ["#6366f1", "#8b5cf6"],
+  hybrid: ["#f59e0b", "#10b981"],
+  debt: ["#0ea5e9", "#14b8a6"],
+  international: ["#8b5cf6", "#06b6d4"],
+};
+const RISK_DOT: Record<string, string> = { Lower: "🟢", Moderate: "🟡", Higher: "🟠", Highest: "🔴" };
 
 export function FundCardExplore({ r, watched, admin, selected, onCompare, why }: { r: UniverseRow; watched: boolean; admin: boolean; selected: boolean; onCompare: () => void; why?: boolean }) {
+  const [a, b] = ASSET_GRADIENT[r.assetClass] ?? ["#64748b", "#0f766e"];
+  const headline = r.r3 !== null ? { label: "a year, over 3 years", v: r.r3 } : r.r1 !== null ? { label: "over the last year", v: r.r1 } : null;
   return (
-    <article className="flex flex-col rounded-2xl border bg-card p-4">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <h3 className="font-medium leading-snug">{r.name.replace(/\s*-\s*Direct Plan.*$/i, "")}</h3>
-          <p className="text-xs text-muted-foreground">
-            {r.amc} · {r.groupLabel} · {r.plan || "Direct"} plan, {r.option || "Growth"}
+    <article className={cn("lift flex flex-col rounded-3xl border bg-card p-5 shadow-card", selected && "ring-2 ring-brand")}>
+      <div className="flex items-start gap-3">
+        <span aria-hidden className="grid size-11 shrink-0 place-items-center rounded-2xl text-xl" style={{ background: `linear-gradient(135deg, ${a}, ${b})` }}>
+          {ASSET_EMOJI[r.assetClass] ?? "💼"}
+        </span>
+        <div className="min-w-0 flex-1">
+          <h3 className="font-semibold leading-snug">{r.name.replace(/\s*-\s*Direct Plan.*$/i, "")}</h3>
+          <p className="truncate text-xs text-muted-foreground">
+            {r.amc} · {r.groupLabel}
           </p>
         </div>
-        {r.label && <span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium", LABEL_TINT[r.label])}>{r.label}</span>}
       </div>
-      <dl className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
-        {(
-          [
-            ["1 year", r.r1],
-            ["3 yrs / yr", r.r3],
-            ["5 yrs / yr", r.r5],
-          ] as const
-        ).map(([k, v]) => (
-          <div key={k} className="rounded-lg bg-muted/50 py-1.5">
-            <dt className="text-muted-foreground">{k}</dt>
-            <dd className={cn("tabular font-medium", tone(v))}>{pct(v)}</dd>
-          </div>
-        ))}
-      </dl>
-      <ul className="mt-3 space-y-0.5 text-xs text-[var(--ink-secondary)]">
-        <li>
-          3 yrs vs <Term slug="category-median">category median</Term>: <span className={cn("tabular", tone(r.vsCat3))}>{r.vsCat3 === null ? "n/a" : `${r.vsCat3 > 0 ? "+" : ""}${r.vsCat3.toFixed(2)} pts`}</span>
-          {r.vsRef3 !== null && (
-            <>
-              {" "}
-              · vs reference index: <span className={cn("tabular", tone(r.vsRef3))}>{`${r.vsRef3 > 0 ? "+" : ""}${r.vsRef3.toFixed(2)} pts`}</span>
-            </>
-          )}
-        </li>
-        <li>
-          <Term slug="drawdown">Worst fall</Term> (3 yrs): <span className="tabular">{r.dd === null ? "n/a" : `${r.dd.toFixed(2)}%`}</span> · beat category median in {r.cons === null ? "n/a" : `${r.cons}%`} of 1-yr periods
-        </li>
-        <li>
-          Typical risk for this category: {r.riskBand} · horizon {r.horizon} · expense ratio: not in our data — check the factsheet
-        </li>
-        <li className="text-muted-foreground">
-          NAV ₹{r.nav?.toFixed(2) ?? "—"} on {r.navDate ?? "—"} · AMFI/MFapi data
-        </li>
-      </ul>
-      {r.group === "index_nifty50" && (
-        <p className="mt-2 text-xs text-[var(--ink-secondary)]">All these funds copy the same index, so differences mostly come from costs and how closely they track it.</p>
-      )}
-      {why && r.strengths.length > 0 && (
-        <div className="mt-3 rounded-lg bg-[var(--tint-good)]/60 p-2.5 text-xs">
-          <div className="font-medium">Why it is on this list</div>
-          <ul className="mt-1 list-disc space-y-0.5 pl-4">
-            {r.strengths.slice(0, 3).map((s) => (
-              <li key={s}>{s}</li>
-            ))}
-          </ul>
-          {r.cautions.length > 0 && <p className="mt-1 text-[var(--ink-secondary)]">Keep in mind: {r.cautions[0].toLowerCase()}.</p>}
+
+      <div className="mt-4 flex items-end justify-between gap-2">
+        <div>
+          <div className={cn("font-display text-2xl font-bold tabular", tone(headline?.v ?? null))}>{headline ? pct(headline.v) : "—"}</div>
+          <div className="text-xs text-muted-foreground">{headline ? headline.label : "not enough history yet"}</div>
         </div>
-      )}
-      <div className="mt-auto flex flex-wrap items-center gap-x-4 gap-y-2 pt-3">
-        <label className="inline-flex items-center gap-1.5 text-xs font-medium">
-          <input type="checkbox" checked={selected} onChange={onCompare} /> Compare
-        </label>
-        <Link href={`/analyse?code=${r.code}`} className="inline-flex items-center gap-1 text-xs font-medium hover:underline">
-          <FileSearch className="size-3.5" aria-hidden /> Analyse fund
+        {r.label && <span className={cn("rounded-full px-2.5 py-1 text-[11px] font-medium", LABEL_TINT[r.label])}>{r.label}</span>}
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-1.5 text-[11px]">
+        <span className="rounded-full bg-muted px-2 py-0.5">
+          {RISK_DOT[r.riskBand]} {r.riskBand} risk
+        </span>
+        <span className="rounded-full bg-muted px-2 py-0.5">⏳ {r.horizon}</span>
+        {r.cons !== null && <span className="rounded-full bg-muted px-2 py-0.5">🎯 beat similar funds {r.cons}% of the time</span>}
+        {r.dd !== null && <span className="rounded-full bg-muted px-2 py-0.5">📉 worst fall {r.dd.toFixed(1)}%</span>}
+      </div>
+
+      {why && r.strengths.length > 0 && <p className="mt-3 rounded-2xl bg-[var(--tint-good)] px-3 py-2 text-xs leading-relaxed">✅ {r.strengths[0]}</p>}
+
+      <details className="group mt-3 text-xs">
+        <summary className="cursor-pointer list-none font-medium text-[var(--ink-secondary)] hover:text-foreground [&::-webkit-details-marker]:hidden">
+          <span className="group-open:hidden">More details ▾</span>
+          <span className="hidden group-open:inline">Less ▴</span>
+        </summary>
+        <dl className="mt-2 grid grid-cols-3 gap-2 text-center">
+          {(
+            [
+              ["1 year", r.r1],
+              ["3 yrs / yr", r.r3],
+              ["5 yrs / yr", r.r5],
+            ] as const
+          ).map(([k, v]) => (
+            <div key={k} className="rounded-lg bg-muted/50 py-1.5">
+              <dt className="text-muted-foreground">{k}</dt>
+              <dd className={cn("tabular font-medium", tone(v))}>{pct(v)}</dd>
+            </div>
+          ))}
+        </dl>
+        <ul className="mt-2 space-y-0.5 text-[var(--ink-secondary)]">
+          <li>
+            3 yrs vs <Term slug="category-median">middle fund in its category</Term>: <span className={cn("tabular", tone(r.vsCat3))}>{r.vsCat3 === null ? "n/a" : `${r.vsCat3 > 0 ? "+" : ""}${r.vsCat3.toFixed(2)} pts`}</span>
+          </li>
+          {r.cautions[0] && <li>Keep in mind: {r.cautions[0].toLowerCase()}.</li>}
+          <li className="text-muted-foreground">
+            NAV ₹{r.nav?.toFixed(2) ?? "—"} on {r.navDate ?? "—"} · expense ratio: check the factsheet
+          </li>
+        </ul>
+      </details>
+
+      <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
+        <button
+          type="button"
+          aria-pressed={selected}
+          onClick={onCompare}
+          className={cn("inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium", selected ? "border-transparent bg-brand text-white dark:text-[var(--page)]" : "hover:bg-muted")}
+        >
+          <Scale className="size-3.5" aria-hidden /> {selected ? "Comparing" : "Compare"}
+        </button>
+        <Link href={`/analyse?code=${r.code}`} className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium hover:bg-muted">
+          <FileSearch className="size-3.5" aria-hidden /> Analyse
         </Link>
         <WatchButton code={r.code} watched={watched} admin={admin} />
       </div>
     </article>
   );
 }
+
+// ---------------------------------------------------------------------------------------------
+// Workspace: chips instead of dropdowns.
+
+type Chip = { id: string; label: string };
+
+function ChipRow({ label, chips, value, onChange }: { label: string; chips: Chip[]; value: string; onChange: (v: string) => void }) {
+  return (
+    <div>
+      <div className="mb-1.5 text-xs font-medium text-muted-foreground">{label}</div>
+      <div role="radiogroup" aria-label={label} className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+        {chips.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            role="radio"
+            aria-checked={value === c.id}
+            onClick={() => onChange(c.id)}
+            className={cn("shrink-0 rounded-full border px-3.5 py-1.5 text-sm", value === c.id ? "border-transparent bg-foreground text-background" : "bg-card text-[var(--ink-secondary)] hover:bg-muted")}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const TYPE_CHIPS: Chip[] = [
+  { id: "all", label: "✨ All" },
+  { id: "equity", label: "📈 Shares" },
+  { id: "index", label: "🧩 Index" },
+  { id: "hybrid", label: "⚖️ Mixed" },
+  { id: "debt", label: "🛟 Bonds" },
+  { id: "international", label: "🌎 Abroad" },
+];
+const RISK_CHIPS: Chip[] = [
+  { id: "all", label: "Any" },
+  { id: "Lower", label: "🟢 Lower" },
+  { id: "Moderate", label: "🟡 Moderate" },
+  { id: "Higher", label: "🟠 Higher" },
+  { id: "Highest", label: "🔴 Highest" },
+];
+const HORIZON_CHIPS: Chip[] = [
+  { id: "all", label: "Any time" },
+  { id: "1", label: "Within a year" },
+  { id: "3", label: "1–3 years" },
+  { id: "5", label: "3–5 years" },
+  { id: "99", label: "5+ years" },
+];
+const SORT_CHIPS: Chip[] = [
+  { id: "score", label: "⭐ Best overall" },
+  { id: "cons", label: "🎯 Most consistent" },
+  { id: "r3", label: "📈 Highest 3-yr return" },
+  { id: "dd", label: "🛡️ Smallest falls" },
+  { id: "vol", label: "😌 Steadiest" },
+];
 
 export function ExploreWorkspace({
   rows,
@@ -194,13 +272,17 @@ export function ExploreWorkspace({
   const [group, setGroup] = useState("all");
   const [risk, setRisk] = useState("all");
   const [horizon, setHorizon] = useState("all");
-  const [history, setHistory] = useState("3");
   const [sort, setSort] = useState("score");
-  const [shown, setShown] = useState(24);
+  const [shown, setShown] = useState(12);
+
+  const groupChips = useMemo(() => {
+    const keys = new Set(rows.filter((r) => asset === "all" || r.assetClass === asset).map((r) => r.group));
+    return [{ id: "all", label: "All" }, ...groups.filter((g) => keys.has(g.key)).map((g) => ({ id: g.key, label: g.label.replace(/\s*funds?\b/i, "").replace(/\s*\(.*\)/, "") }))];
+  }, [rows, groups, asset]);
 
   const view = useMemo(() => {
     const needle = q.trim().toLowerCase();
-    const minYears = Number(history);
+    const h = Number(horizon);
     return rows
       .filter(
         (r) =>
@@ -208,104 +290,86 @@ export function ExploreWorkspace({
           (asset === "all" || r.assetClass === asset) &&
           (group === "all" || r.group === group) &&
           (risk === "all" || r.riskBand === risk) &&
-          (horizon === "all" || r.horizonYears <= Number(horizon)) &&
-          (minYears === 0 || (minYears === 3 ? r.r3 !== null : r.r5 !== null)),
+          (horizon === "all" || (h === 99 ? r.horizonYears >= 5 : h === 1 ? r.horizonYears <= 1 : r.horizonYears <= h && r.horizonYears > (h === 3 ? 1 : 3))),
       )
       .sort((a, b) => {
-        const k = sort as "score" | "r1" | "r3" | "r5" | "vol" | "dd" | "cons";
+        const k = sort as "score" | "r3" | "vol" | "dd" | "cons";
         const av = a[k];
         const bv = b[k];
         if (av === null) return 1;
         if (bv === null) return -1;
         return k === "vol" ? av - bv : bv - av;
       });
-  }, [rows, q, asset, group, risk, horizon, history, sort]);
+  }, [rows, q, asset, group, risk, horizon, sort]);
 
-  const sel = (id: string, label: string, value: string, set: (v: string) => void, opts: [string, string][]) => (
-    <div className="space-y-1">
-      <Label htmlFor={id} className="text-xs">
-        {label}
-      </Label>
-      <select
-        id={id}
-        value={value}
-        onChange={(e) => {
-          set(e.target.value);
-          setShown(24);
-        }}
-        className="h-9 w-full rounded-md border bg-background px-2 text-sm"
-      >
-        {opts.map(([v, l]) => (
-          <option key={v} value={v}>
-            {l}
-          </option>
-        ))}
-      </select>
-    </div>
-  );
+  const reset = (fn: (v: string) => void) => (v: string) => {
+    fn(v);
+    setShown(12);
+  };
 
   return (
-    <div className="space-y-8">
-      <section>
-        <h2 className="text-lg font-semibold">Funds worth exploring</h2>
-        <p className="mb-3 text-sm text-[var(--ink-secondary)]">A short list to research further — chosen for long-term consistency within each category, not for last year&apos;s return.</p>
-        {shortlist.length ? (
-          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+    <div className="space-y-10">
+      {shortlist.length > 0 && (
+        <section>
+          <h2 className="text-xl font-bold">
+            Top picks to research <span aria-hidden>⭐</span>
+          </h2>
+          <p className="mb-4 text-sm text-muted-foreground">Chosen for steady long-term records within their own category — not last year&apos;s winners.</p>
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {shortlist.map((r) => (
               <FundCardExplore key={r.code} r={r} watched={watched.includes(r.code)} admin={admin} selected={cmp.sel.includes(r.code)} onCompare={() => cmp.toggle(r.code)} why />
             ))}
           </div>
-        ) : (
-          <p className="rounded-xl border border-dashed p-6 text-sm text-muted-foreground">No fund currently meets the shortlist bar for your preferences. Browse all funds below.</p>
-        )}
-      </section>
+        </section>
+      )}
 
       <section>
-        <h2 className="text-lg font-semibold">Browse all funds</h2>
-        <p className="mb-3 text-sm text-[var(--ink-secondary)]">
-          {rows.length} Direct-Growth schemes across {groups.length} categories, from AMFI&apos;s list. Funds are only ranked against their own category.
-        </p>
-        <div className="grid gap-3 rounded-2xl border bg-card p-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="space-y-1 sm:col-span-2">
-            <Label htmlFor="ex-q" className="text-xs">
-              Fund or fund house
-            </Label>
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-2.5 top-2.5 size-4 text-muted-foreground" aria-hidden />
-              <Input
-                id="ex-q"
-                className="pl-8"
-                placeholder="e.g. Parag Parikh, HDFC, Nifty 50"
-                value={q}
-                onChange={(e) => {
-                  setQ(e.target.value);
-                  setShown(24);
-                }}
-              />
-            </div>
+        <h2 className="text-xl font-bold">Find a fund</h2>
+        <p className="mb-4 text-sm text-muted-foreground">{rows.length} funds · tap to filter</p>
+        <div className="space-y-4 rounded-3xl border bg-card p-5 shadow-card">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-2.5 size-4 text-muted-foreground" aria-hidden />
+            <Input
+              aria-label="Search by fund or fund house"
+              className="rounded-full pl-9"
+              placeholder="Search e.g. Parag Parikh, HDFC, Nifty 50"
+              value={q}
+              onChange={(e) => {
+                setQ(e.target.value);
+                setShown(12);
+              }}
+            />
           </div>
-          {sel("ex-asset", "Type", asset, setAsset, [["all", "All types"], ...Object.entries(ASSET_LABEL)] as [string, string][])}
-          {sel("ex-group", "Category", group, setGroup, [["all", "All categories"], ...groups.map((g) => [g.key, g.label] as [string, string])])}
-          {sel("ex-risk", "Typical risk", risk, setRisk, [["all", "Any"], ["Lower", "Lower"], ["Moderate", "Moderate"], ["Higher", "Higher"], ["Highest", "Highest"]])}
-          {sel("ex-horizon", "My horizon", horizon, setHorizon, [["all", "Any"], ["1", "Up to 1 year"], ["3", "Up to 3 years"], ["5", "Up to 5 years"], ["7", "7+ years"]])}
-          {sel("ex-history", "Track record", history, setHistory, [["0", "Any history"], ["3", "At least 3 years"], ["5", "At least 5 years"]])}
-          {sel("ex-sort", "Sort by", sort, setSort, [["score", "Research score"], ["cons", "Consistency"], ["r3", "3-year return"], ["r5", "5-year return"], ["r1", "1-year return"], ["vol", "Lowest volatility"], ["dd", "Smallest worst fall"]])}
+          <ChipRow
+            label="What it invests in"
+            chips={TYPE_CHIPS}
+            value={asset}
+            onChange={(v) => {
+              reset(setAsset)(v);
+              setGroup("all");
+            }}
+          />
+          {groupChips.length > 2 && <ChipRow label="Category" chips={groupChips} value={group} onChange={reset(setGroup)} />}
+          <ChipRow label="How much ups and downs" chips={RISK_CHIPS} value={risk} onChange={reset(setRisk)} />
+          <ChipRow label="When I need the money" chips={HORIZON_CHIPS} value={horizon} onChange={reset(setHorizon)} />
+          <ChipRow label="Show first" chips={SORT_CHIPS} value={sort} onChange={reset(setSort)} />
         </div>
-        <p className="mt-3 text-xs text-muted-foreground" role="status">
+
+        <p className="mt-4 text-sm text-muted-foreground" role="status">
           {view.length} matching fund{view.length === 1 ? "" : "s"}
         </p>
         {view.length === 0 ? (
-          <p className="mt-2 rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">No funds match. Loosen a filter.</p>
+          <p className="mt-2 rounded-3xl border border-dashed p-8 text-center text-sm text-muted-foreground">No funds match. Try removing a filter.</p>
         ) : (
           <>
-            <div className="mt-2 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-3 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {view.slice(0, shown).map((r) => (
                 <FundCardExplore key={r.code} r={r} watched={watched.includes(r.code)} admin={admin} selected={cmp.sel.includes(r.code)} onCompare={() => cmp.toggle(r.code)} />
               ))}
             </div>
             {shown < view.length && (
-              <div className="mt-4 text-center">
-                <Button variant="outline" onClick={() => setShown((s) => s + 24)}>
+              <div className="mt-5 text-center">
+                <Button variant="outline" className="rounded-full" onClick={() => setShown((s) => s + 12)}>
                   Show more ({view.length - shown} left)
                 </Button>
               </div>

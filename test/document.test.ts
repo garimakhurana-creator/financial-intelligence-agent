@@ -68,8 +68,19 @@ describe("assess (deterministic outcome)", () => {
     expect(r.outcome).toBe("Several concerns to investigate");
     expect(r.concerns.length).toBeGreaterThanOrEqual(2);
   });
-  it("under 3 years of history → Insufficient data", () => {
-    expect(assess({ ...base, metrics: metrics(null, 12, -14) }).outcome).toBe("Insufficient data for a reliable assessment");
+  it("under 3 years of history is judged on its 1-year record, with the short history noted", () => {
+    const r = assess({ ...base, metrics: metrics(null, 12, -14) });
+    expect(r.outcome).toBe("Suitable for further comparison");
+    expect(r.outcomeReason).toMatch(/less than 3 years/);
+    expect(r.concerns.find((c) => /Less than 3 years/.test(c.text))?.limitation).toBe(true);
+  });
+  it("no 1-year record either → Insufficient data", () => {
+    const m = metrics(null, 12, -14) as unknown as { returns: Record<string, unknown> };
+    const r = assess({ ...base, metrics: { ...m, returns: { ...m.returns, "1Y": { total: null, annualised: null, fromDate: null } } } as never });
+    expect(r.outcome).toBe("Insufficient data for a reliable assessment");
+  });
+  it("no comparable category → Insufficient data", () => {
+    expect(assess({ ...base, category: null } as never).outcome).toBe("Insufficient data for a reliable assessment");
   });
   it("Regular plan is called out as a cost concern", () => {
     const r = assess({ ...base, scheme: { ...base.scheme, plan: "Regular" }, metrics: metrics(15, 12, -14) });

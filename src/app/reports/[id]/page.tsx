@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { NewsList, SectionTitle, WINDOW_LABEL } from "@/components/blocks";
 import { WeatherHero } from "@/components/home";
+import { KindTabs } from "@/components/kind-tabs";
 import {
   DateText,
   Pct,
@@ -267,34 +268,33 @@ async function Report({
 
       <section>
         <h2 className="mb-4 text-xl font-bold">By kind of fund</h2>
-        <div className="grid gap-4 md:grid-cols-2">
-          {p.output.categories.map((c) => (
-            <div
-              key={c.viewId}
-              className="rounded-3xl border bg-card p-5 shadow-card"
-            >
-              <Link
-                href={`/categories/${c.viewId}`}
-                className="text-xs font-medium uppercase tracking-wide text-muted-foreground hover:underline"
-              >
-                <span aria-hidden>{FUND_EMOJI[c.viewId]}</span>{" "}
-                {VIEWS[c.viewId].title}
-              </Link>
-              <h3 className="mt-1 font-semibold">{c.headline}</h3>
-              <p className="mt-1 text-sm leading-relaxed">
-                {c.summary}
-                {cite(c.evidenceIds)}
-              </p>
-              {c.watchItems.length > 0 && (
-                <ul className="mt-2 list-disc pl-5 text-sm text-[var(--ink-secondary)]">
-                  {c.watchItems.map((w) => (
-                    <li key={w}>{w}</li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
-        </div>
+        <KindTabs
+          label="Kind of fund"
+          items={p.output.categories.map((c) => ({
+            id: c.viewId,
+            label: VIEWS[c.viewId].short,
+            emoji: FUND_EMOJI[c.viewId],
+            content: (
+              <div className="h-full rounded-3xl border bg-card p-5 shadow-card">
+                <Link href={`/categories/${c.viewId}`} className="text-xs font-medium uppercase tracking-wide text-muted-foreground hover:underline">
+                  <span aria-hidden>{FUND_EMOJI[c.viewId]}</span> {VIEWS[c.viewId].title}
+                </Link>
+                {c.headline.trim().toLowerCase() !== VIEWS[c.viewId].title.toLowerCase() && <h3 className="mt-1 font-semibold">{c.headline}</h3>}
+                <p className="mt-1 text-sm leading-relaxed">
+                  {c.summary}
+                  {cite(c.evidenceIds)}
+                </p>
+                {c.watchItems.length > 0 && (
+                  <ul className="mt-2 list-disc pl-5 text-sm text-[var(--ink-secondary)]">
+                    {c.watchItems.map((w) => (
+                      <li key={w}>{w}</li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ),
+          }))}
+        />
       </section>
 
       <section>

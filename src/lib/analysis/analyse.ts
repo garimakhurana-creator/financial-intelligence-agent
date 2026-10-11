@@ -11,11 +11,11 @@ import { mapLimit } from "@/lib/http";
 import { errorMessage } from "@/lib/log";
 import type { DiscoveryFundData, DiscoveryGroupData } from "@/lib/pipeline/discovery";
 import { allowedNumbers, hasAdvice, isAllowedNumber, numberTokens } from "@/lib/report/validate";
-import { fetchNavAll, isDirectGrowth, selectPeerUniverse } from "@/lib/sources/amfi";
+import { fetchNavAll, isDirectGrowth, selectPeerUniverse, type AmfiScheme } from "@/lib/sources/amfi";
 import { fetchSchemeHistory, MFAPI_SOURCE, type SchemeMeta } from "@/lib/sources/mfapi";
 import type { DocumentFacts } from "@/lib/analysis/document";
 
-export const ANALYSIS_VERSION = "analysis-v1";
+export const ANALYSIS_VERSION = "analysis-v2";
 
 export const OUTCOMES = ["Worth researching further", "Suitable for further comparison", "Several concerns to investigate", "Insufficient data for a reliable assessment"] as const;
 export type Outcome = (typeof OUTCOMES)[number];
@@ -24,6 +24,8 @@ export interface Finding {
   text: string;
   /** Where the evidence comes from: "nav" (computed), "document" (verified quote), "category" (peer data). */
   basis: "nav" | "document" | "category";
+  /** A gap in the data (e.g. short history), shown to the reader but not counted as a concern about the fund. */
+  limitation?: boolean;
 }
 
 export interface AnalysisFacts {
@@ -68,6 +70,11 @@ export function assess(f: Omit<AnalysisFacts, "strengths" | "concerns" | "outcom
     if (r3 - med.r3 >= 1) s.push({ text: `3-year annual return of ${r3.toFixed(2)}% is ${pp(r3 - med.r3)} points above the category median of ${med.r3.toFixed(2)}%.`, basis: "category" });
     if (r3 - med.r3 <= -1) c.push({ text: `3-year annual return of ${r3.toFixed(2)}% is ${pp(r3 - med.r3)} points below the category median of ${med.r3.toFixed(2)}%.`, basis: "category" });
   }
+  const r1 = m?.returns["1Y"].total ?? null;
+  if (r3 === null && r1 !== null && med?.r1 != null) {
+    if (r1 - med.r1 >= 2) s.push({ text: `1-year return of ${r1.toFixed(2)}% is ${pp(r1 - med.r1)} points above the category median of ${med.r1.toFixed(2)}%.`, basis: "category" });
+    if (r1 - med.r1 <= -2) c.push({ text: `1-year return of ${r1.toFixed(2)}% is ${pp(r1 - med.r1)} points below the category median of ${med.r1.toFixed(2)}%.`, basis: "category" });
+  }
   if (r5 !== null && med?.r5 != null) {
     if (r5 - med.r5 >= 1) s.push({ text: `5-year annual return of ${r5.toFixed(2)}% is ${pp(r5 - med.r5)} points above the category median.`, basis: "category" });
     if (r5 - med.r5 <= -1) c.push({ text: `5-year annual return of ${r5.toFixed(2)}% is ${pp(r5 - med.r5)} points below the category median.`, basis: "category" });
@@ -91,20 +98,29 @@ export function assess(f: Omit<AnalysisFacts, "strengths" | "concerns" | "outcom
   if (f.scheme?.option === "IDCW") c.push({ text: "IDCW (payout) option: its NAV drops on each payout, so NAV returns understate total returns.", basis: "nav" });
   const ter = f.document?.fields.expenseRatioDirect;
   if (ter?.verified && typeof ter.value === "number") s.push({ text: `Direct-plan expense ratio of ${ter.value}% is stated in the factsheet.`, basis: "document" });
-  if (f.scheme && m && m.returns["3Y"].total === null) c.push({ text: "Less than 3 years of NAV history, so its long-term record cannot be judged yet.", basis: "nav" });
-  if (f.scheme && !f.group) c.push({ text: "No comparable peer group is configured for this category, so it is not compared with similar funds.", basis: "category" });
-  if (f.group?.key === "fof_overseas") c.push({ text: "Overseas funds track different countries and indices, so the category average mixes unlike funds.", basis: "category" });
+  if (f.scheme && m && m.returns["3Y"].total === null) c.push({ text: "Less than 3 years of NAV history, so its long-term record cannot be judged yet.", basis: "nav", limitation: true });
+  if (f.scheme && !f.category) c.push({ text: "Too few similar funds with price history were found, so it is not compared with a category.", basis: "category", limitation: true });
+  if (f.group?.key === "fof_overseas") c.push({ text: "Overseas funds track different countries and indices, so the category average mixes unlike funds.", basis: "category", limitation: true });
+  if (f.group?.key === "amfi") c.push({ text: `Compared with ${f.category?.peers ?? "other"} funds in the same AMFI category (${f.group.label}); funds in broad categories can follow quite different themes.`, basis: "category", limitation: true });
   const unverified = f.document ? Object.values(f.document.fields).filter((x) => x.value !== null && !x.verified).length : 0;
   if (unverified > 0) c.push({ text: `${unverified} factsheet field(s) could not be verified against the document text and are shown for reference only.`, basis: "document" });
 
   // Outcome rules (documented on the page):
-  const hasLongRecord = r3 !== null && f.category !== null;
+  // Judged on 3 years when available, otherwise on 1 year (flagged as a limitation).
+  const hasRecord = (r3 !== null || r1 !== null) && f.category !== null;
   let outcome: Outcome;
   let reason: string;
-  const material = c.filter((x) => x.basis !== "document");
-  if (!f.scheme || !hasLongRecord) {
+  const material = c.filter((x) => x.basis !== "document" && !x.limitation);
+  if (!f.scheme || !hasRecord) {
     outcome = "Insufficient data for a reliable assessment";
-    reason = !f.scheme ? "The fund could not be matched to NAV history, so its record cannot be checked." : "There is not yet 3 years of history and a peer group to compare against.";
+    reason = !f.scheme
+      ? "The fund could not be matched to NAV history, so its record cannot be checked."
+      : r1 === null
+        ? "The fund has less than a year of price history, so there is nothing reliable to compare yet."
+        : "Too few similar funds with price history were found to compare it with.";
+  } else if (r3 === null) {
+    outcome = material.length >= 1 ? "Several concerns to investigate" : "Suitable for further comparison";
+    reason = `It has less than 3 years of history, so this is based on its last year only${material.length ? "; the concern above is worth checking" : ""}. Revisit it once it has a longer record.`;
   } else if (material.length >= 2) {
     outcome = "Several concerns to investigate";
     reason = `${material.length} evidence-based concerns were found; look into them before going further.`;
@@ -116,6 +132,26 @@ export function assess(f: Omit<AnalysisFacts, "strengths" | "concerns" | "outcom
     reason = "The record is mixed or average for its category; compare it with the alternatives listed.";
   }
   return { strengths: s, concerns: c, outcome, outcomeReason: reason };
+}
+
+/** Cap on live-computed peers (each needs a price-history request). */
+const LIVE_PEER_CAP = 40;
+const MIN_LIVE_PEERS = 5;
+
+const normCategory = (c: string) => (c.split(" - ").slice(1).join(" ") || c).toLowerCase().replace(/fund|schemes?/g, "").replace(/[^a-z]/g, "");
+
+/** Words in a fund's name that identify its index or theme (so a bank fund is compared with bank funds). */
+const THEME_RE =
+  /\b(nifty\s*next\s*50|nifty\s*midcap\s*150|nifty\s*smallcap\s*250|nifty\s*500|nifty\s*bank|nifty\s*it|sensex|nasdaq|s&p\s*500|bank|banking|financial|pharma|health|healthcare|technology|tech|digital|infra|infrastructure|consumption|psu|manufacturing|energy|auto|esg|defen[cs]e|mnc|dividend\s*yield|business\s*cycle|gold|silver)\b/i;
+
+/** Funds in the same AMFI category (both label taxonomies), narrowed to the same theme when the name shows one. */
+export function similarByCategory(all: AmfiScheme[], meta: SchemeMeta): { label: string; members: AmfiScheme[] } {
+  const key = normCategory(meta.schemeCategory);
+  const same = all.filter((s) => s.structure === "Open Ended Schemes" && normCategory(s.category) === key && isDirectGrowth(s));
+  const theme = THEME_RE.exec(meta.schemeName)?.[0].toLowerCase().replace(/\s+/g, " ");
+  const themed = theme ? same.filter((s) => s.schemeName.toLowerCase().replace(/\s+/g, " ").includes(theme)) : [];
+  const label = (meta.schemeCategory.split(" - ")[1] ?? meta.schemeCategory).trim();
+  return themed.length >= MIN_LIVE_PEERS + 1 ? { label: `${label} (${theme})`, members: themed } : { label, members: same };
 }
 
 /** Resolve a scheme and compute everything deterministic about it. */
@@ -143,18 +179,46 @@ export async function buildFacts(input: { schemeCode: number | null; document: D
         category = { medians: stored.data.medians, reference: stored.data.reference, computedAt: stored.computedAt, peers: stored.data.fetched };
         sources.push(`Category medians: ${stored.data.fetched} Direct-Growth ${rule.label.toLowerCase()} (computed ${stored.computedAt.slice(0, 10)})`);
       }
-      // Consistency needs every peer's rolling 1-year returns on the same dates.
-      try {
-        const amfi = await fetchNavAll();
-        const peers = selectPeerUniverse(amfi, rule).members.filter((p) => p.schemeCode !== input.schemeCode && isDirectGrowth(p));
-        const from = addDays(minusMonths(asOf, 60), -15);
-        const hist = await mapLimit(peers, 8, (p) => fetchSchemeHistory(p.schemeCode, { from, to: asOf }));
-        const anchor = metrics.asOf ?? asOf;
-        const rolling = hist.flatMap((r) => (r.status === "fulfilled" ? [computeFundMetrics(r.value.series, anchor).rolling1Y] : []));
-        consistency = consistencyVsCategory(metrics.rolling1Y, rolling);
-      } catch (e) {
-        sources.push(`Consistency not computed: ${errorMessage(e)}`);
+    }
+    // Peers for consistency — and, when no stored category exists, for live category medians.
+    // Configured group first; otherwise funds in the same AMFI category (same theme/index where
+    // the name shows one), so sector, theme and other index funds still get a comparison.
+    try {
+      const amfi = await fetchNavAll();
+      const fromRule = rule ? selectPeerUniverse(amfi, rule).members : [];
+      const live = fromRule.length ? null : similarByCategory(amfi, h.meta);
+      const peers = (fromRule.length ? fromRule : (live?.members ?? [])).filter((p) => p.schemeCode !== input.schemeCode && isDirectGrowth(p)).slice(0, LIVE_PEER_CAP);
+      const from = addDays(minusMonths(asOf, 60), -15);
+      const hist = await mapLimit(peers, 8, (p) => fetchSchemeHistory(p.schemeCode, { from, to: asOf }));
+      const anchor = metrics.asOf ?? asOf;
+      const peerMetrics = hist.flatMap((r) => (r.status === "fulfilled" ? [computeFundMetrics(r.value.series, anchor)] : [])).filter((m) => m.asOf !== null);
+      consistency = consistencyVsCategory(metrics.rolling1Y, peerMetrics.map((m) => m.rolling1Y));
+      if (!category && peerMetrics.length >= MIN_LIVE_PEERS) {
+        const med = (xs: (number | null | undefined)[]) => {
+          const v = xs.filter((x): x is number => typeof x === "number" && Number.isFinite(x)).sort((a, b) => a - b);
+          if (!v.length) return null;
+          const k = v.length >> 1;
+          return v.length % 2 ? v[k] : (v[k - 1] + v[k]) / 2;
+        };
+        category = {
+          medians: {
+            r1: med(peerMetrics.map((m) => m.returns["1Y"].total)),
+            r3: med(peerMetrics.map((m) => m.returns["3Y"].annualised)),
+            r5: med(peerMetrics.map((m) => m.returns["5Y"].annualised)),
+            vol: med(peerMetrics.map((m) => m.volatility3Y)),
+            dd: med(peerMetrics.map((m) => m.maxDrawdown3Y?.pct)),
+          },
+          reference: null,
+          computedAt: new Date().toISOString(),
+          peers: peerMetrics.length,
+        };
+        if (!group) group = { key: "amfi", label: live?.label ?? h.meta.schemeCategory, plain: "Compared with other Direct-Growth funds in the same AMFI category.", horizon: "depends on the fund", riskBand: "see the factsheet riskometer" };
+        sources.push(`Category medians computed live from ${peerMetrics.length} Direct-Growth funds in "${live?.label ?? rule?.label ?? h.meta.schemeCategory}" (AMFI list + MFapi prices)`);
       }
+    } catch (e) {
+      sources.push(`Peer comparison not computed: ${errorMessage(e)}`);
+    }
+    if (rule && g) {
       const alts = (await cached.fundMetrics<DiscoveryFundData>(g.key))
         .filter((a) => a.schemeCode !== input.schemeCode && a.score !== null)
         .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))

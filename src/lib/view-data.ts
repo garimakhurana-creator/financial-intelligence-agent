@@ -110,15 +110,20 @@ export async function loadManage() {
   return { funds, runs, reports, integrations: integrationStatus() };
 }
 
+const HEADLINE = ["NIFTY50", "NIFTY_MIDCAP150", "NIFTY_SMALLCAP100"];
+
 export async function loadPortfolio() {
   await connection();
   const asOf = todayIn(REPORT_TZ());
   const [funds, admin] = await Promise.all([cached.funds(), isAdmin()]);
-  const performance = await Promise.all(funds.map((f) => cached.fundPerformance(f, asOf)));
-  const holdings = admin ? await research.listHoldings().catch(() => []) : [];
+  const [performance, indices, holdings] = await Promise.all([
+    Promise.all(funds.map((f) => cached.fundPerformance(f, asOf))),
+    Promise.all((HEADLINE as IndexId[]).map((id) => cached.indexPerformance(id, asOf))),
+    admin ? research.listHoldings().catch(() => []) : Promise.resolve([]),
+  ]);
   const withPeer = performance.map((p, i) => ({ ...p, peerKey: funds[i].peerKey }));
   const portfolio = admin ? summarisePortfolio(holdings, withPeer) : null;
-  return { asOf, admin, funds, performance, holdings, portfolio };
+  return { asOf, admin, funds, performance, indices, holdings, portfolio };
 }
 
 export async function loadMarket() {

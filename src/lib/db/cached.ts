@@ -137,3 +137,11 @@ export async function latestMarketBrief<D>() {
   cacheLife("hours");
   return research.getLatestMarketBrief<D>();
 }
+
+/**
+ * After a job refreshes the data, open the main pages once so their cached reads are rebuilt
+ * before Meera visits (otherwise the first visit of the day pays for every database read).
+ */
+export async function warmPages(baseUrl: string) {
+  await Promise.allSettled(["/", "/market", "/portfolio", "/explore"].map((path) => fetch(`${baseUrl}${path}`, { signal: AbortSignal.timeout(25_000) }).then((r) => r.arrayBuffer())));
+}

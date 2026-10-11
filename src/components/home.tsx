@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { Carousel } from "@/components/carousel";
-import { Sparkline } from "@/components/charts";
 import { formatHuman } from "@/lib/dates";
 import { cleanTitle, topicArt } from "@/lib/news/art";
 import type { FundPerformance, IndexPerformance } from "@/lib/pipeline/data";
@@ -18,6 +17,22 @@ export const shortName = (n: string) => n.replace(/\s*-\s*Direct Plan.*$/i, "").
 const inr = (n: number) => `₹${n.toLocaleString("en-IN")}`;
 const gradientOf = (view: string | null) => FUND_GRADIENT[(view ?? "") as ViewId] ?? ["#64748b", "#0f766e"];
 const emojiOf = (view: string | null) => FUND_EMOJI[(view ?? "") as ViewId] ?? "💼";
+
+/** A tiny SVG trend line — no chart library, so the dashboard stays light. */
+export function MiniTrend({ data, height = 36 }: { data: { value: number }[]; height?: number }) {
+  if (data.length < 2) return null;
+  const vals = data.map((d) => d.value);
+  const min = Math.min(...vals);
+  const span = Math.max(...vals) - min || 1;
+  const w = 100;
+  const pts = vals.map((v, i) => `${((i / (vals.length - 1)) * w).toFixed(1)},${(height - 3 - ((v - min) / span) * (height - 6)).toFixed(1)}`).join(" ");
+  const up = vals.at(-1)! >= vals[0];
+  return (
+    <svg aria-hidden viewBox={`0 0 ${w} ${height}`} preserveAspectRatio="none" className="h-9 w-full overflow-visible">
+      <polyline points={pts} fill="none" stroke={up ? "var(--up)" : "var(--down)"} strokeWidth={1.75} vectorEffect="non-scaling-stroke" strokeLinejoin="round" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 export function fundStatus(f: FundPerformance): { emoji: string; text: string; cls: string } {
   if (!f.nav) return { emoji: "⏳", text: "Waiting for price", cls: "bg-muted text-[var(--ink-secondary)]" };
@@ -55,7 +70,6 @@ export function WeatherHero({ label, reason, weekEnding, reportId }: { label: st
               Read this week&apos;s story <ArrowRight className="size-4" aria-hidden />
             </Link>
           )}
-          <span className="text-xs opacity-70">A check-in, not advice to buy or sell.</span>
         </div>
       </div>
     </section>
@@ -186,7 +200,7 @@ export function FundCards({ funds }: { funds: FundPerformance[] }) {
                   ))}
                 </div>
                 <div className="w-24 shrink-0">
-                  <Sparkline data={f.chart.slice(-23)} height={36} />
+                  <MiniTrend data={f.chart.slice(-23)} />
                 </div>
               </div>
               {k !== null && (
