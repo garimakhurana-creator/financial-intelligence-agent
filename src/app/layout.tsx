@@ -1,34 +1,50 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
-import { AppNav } from "@/components/app-nav";
+import { Suspense } from "react";
+import { Fraunces, Geist, Geist_Mono } from "next/font/google";
+import { AppNav, AppNavFallback } from "@/components/app-nav";
+import { AssistantLauncher } from "@/components/assistant";
+import { THEME_SCRIPT } from "@/components/theme";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { isAdmin } from "@/lib/auth";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+const display = Fraunces({ variable: "--font-display", subsets: ["latin"], weight: ["500", "600"] });
 
 export const metadata: Metadata = {
-  title: "Meera's Fund Intelligence",
+  title: "Meera's Money · Fund intelligence",
   description: "Plain-language mutual fund intelligence: weekly portfolio checks, market news, fund research and analysis.",
 };
 
+/** Session cookie is request-time data, so the nav that depends on it streams inside Suspense. */
+async function NavWithSession() {
+  return <AppNav admin={await isAdmin()} />;
+}
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html lang="en" data-theme="light" suppressHydrationWarning className={`${geistSans.variable} ${geistMono.variable} ${display.variable} h-full antialiased`}>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className="min-h-full">
         <TooltipProvider>
           <div className="flex min-h-screen flex-col lg:flex-row">
-            <AppNav />
+            <Suspense fallback={<AppNavFallback />}>
+              <NavWithSession />
+            </Suspense>
             <div className="flex min-w-0 flex-1 flex-col">
-              <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:px-8 lg:py-8">{children}</main>
+              <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 sm:px-6 lg:px-10 lg:py-10">{children}</main>
               <footer className="border-t print:hidden">
-                <div className="mx-auto max-w-6xl px-4 py-5 text-xs leading-relaxed text-[var(--ink-muted)] sm:px-6 lg:px-8">
+                <div className="mx-auto max-w-6xl px-4 py-5 text-xs leading-relaxed text-[var(--ink-muted)] sm:px-6 lg:px-10">
                   NAVs from AMFI via MFapi.in · indices from Yahoo Finance and NSE · news via Tavily and GNews · explanations by Gemini Flash, checked against
                   the data. Past performance does not guarantee future returns. Research and monitoring only — not investment advice.
                 </div>
               </footer>
             </div>
           </div>
+          <AssistantLauncher />
         </TooltipProvider>
       </body>
     </html>

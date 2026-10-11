@@ -6,7 +6,8 @@ import { cookies } from "next/headers";
 // every outbound send requires this session. Cron endpoints use CRON_SECRET instead.
 
 export const SESSION_COOKIE = "mft_admin";
-const SESSION_TTL_S = 12 * 60 * 60;
+// 30 days, so the owner is not asked to sign in again every visit.
+const SESSION_TTL_S = 30 * 24 * 60 * 60;
 
 function signingKey(): string {
   const pw = process.env.ADMIN_PASSWORD;
