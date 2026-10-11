@@ -7,6 +7,8 @@ import { SendControls } from "@/components/send-controls";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { isAdmin } from "@/lib/auth";
+import { reportUrl } from "@/lib/delivery/deliver";
+import { whatsappShareLink, whatsappShareText } from "@/lib/delivery/share";
 import { VIEWS } from "@/lib/catalog";
 import { WINDOWS } from "@/lib/calc/returns";
 import { loadReport } from "@/lib/view-data";
@@ -37,6 +39,9 @@ async function Report({ params }: { params: PageProps<"/reports/[id]">["params"]
   const p = report.report;
   const admin = await isAdmin();
   const evidence = new Map(p.news.map((n) => [n.evidenceId, n]));
+  const shareText = whatsappShareText(report, reportUrl(report.id));
+  // The owner's number is only used for the signed-in owner; public visitors get a number-less link.
+  const ownerNumber = admin ? process.env.WHATSAPP_SHARE_NUMBER?.trim() : null;
   const cite = (ids: string[]) =>
     ids.length > 0 && (
       <span className="ml-1 inline-flex flex-wrap gap-1 align-middle">
@@ -65,6 +70,18 @@ async function Report({ params }: { params: PageProps<"/reports/[id]">["params"]
       </div>
 
       <AssessmentBanner label={report.assessment} reason={report.assessmentReason} weekEnding={report.weekEnding} />
+
+      <div className="flex flex-wrap items-center gap-2 text-sm">
+        <a href={whatsappShareLink(shareText)} target="_blank" rel="noopener noreferrer" className="rounded-md border bg-card px-3 py-1.5 font-medium hover:bg-muted">
+          Share on WhatsApp
+        </a>
+        {ownerNumber && (
+          <a href={whatsappShareLink(shareText, ownerNumber)} target="_blank" rel="noopener noreferrer" className="rounded-md border bg-card px-3 py-1.5 font-medium hover:bg-muted">
+            Send to my WhatsApp
+          </a>
+        )}
+        <span className="text-xs text-muted-foreground">Opens WhatsApp with the summary filled in — you press Send.</span>
+      </div>
 
       <section>
         <SectionTitle sub="Three sentences per fund: performance, comparison, and what may explain it. Figures in the tables are the verified numbers.">Your funds</SectionTitle>

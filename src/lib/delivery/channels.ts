@@ -3,6 +3,7 @@ import { formatHuman } from "@/lib/dates";
 import { MissingConfigError, requireEnv } from "@/lib/env";
 import type { StoredWeeklyReport } from "@/lib/report/build";
 import { maskEmail, maskPhone, renderEmail } from "@/lib/delivery/render";
+import { whatsappShareLink, whatsappShareText } from "@/lib/delivery/share";
 
 export interface SendResult {
   providerMessageId: string;
@@ -136,7 +137,10 @@ export function renderTelegram(report: StoredWeeklyReport, reportUrl: string, op
     const name = report.report.funds.find((x) => x.schemeCode === f.schemeCode)?.schemeName.replace(/\s*-\s*Direct Plan.*$/i, "") ?? String(f.schemeCode);
     return `▪️ ${name}\n${f.performance}\n${f.comparison}\n${f.marketContext}`;
   });
-  const tail = `🌐 Market: ${out.marketSummary.text}\n\nFull report with sources: ${reportUrl}\n\nNot investment advice. Past performance does not guarantee future returns.`;
+  // Private chat, so the owner's own number is fine here (never shown on public pages).
+  const waNum = process.env.WHATSAPP_SHARE_NUMBER?.trim();
+  const wa = waNum ? `\n\nSave to WhatsApp (one tap, then Send): ${whatsappShareLink(whatsappShareText(report, reportUrl), waNum)}` : "";
+  const tail = `🌐 Market: ${out.marketSummary.text}\n\nFull report with sources: ${reportUrl}${wa}\n\nNot investment advice. Past performance does not guarantee future returns.`;
   const messages: string[] = [];
   let cur = head;
   for (const block of [...funds, tail]) {

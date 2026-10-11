@@ -89,3 +89,16 @@ describe("yahoo parsing", () => {
     expect(parseYahooChart(raw, { dropWeekends: true }).map((o) => o.date)).toEqual(["2026-10-09"]);
   });
 });
+
+describe("whatsapp share link", () => {
+  it("normalises messy numbers to wa.me digits", async () => {
+    const { waNumber } = await import("@/lib/delivery/share");
+    expect(waNumber("<+91 70157 57859>")).toBe("917015757859");
+    expect(waNumber("abc")).toBeNull();
+  });
+  it("omits the number when none is given, so public pages never expose it", async () => {
+    const { whatsappShareLink } = await import("@/lib/delivery/share");
+    expect(whatsappShareLink("hi & bye")).toBe("https://wa.me/?text=hi%20%26%20bye");
+    expect(whatsappShareLink("hi", "+91 70157 57859")).toBe("https://wa.me/917015757859?text=hi");
+  });
+});
