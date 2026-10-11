@@ -1,24 +1,26 @@
-import Link from "next/link";
 import { Suspense } from "react";
-import { FundCard, MarketStrip, VerdictHero } from "@/components/simple";
+import { AssessmentPanel, FundSummary, Highlights, PortfolioCards, QuickActions } from "@/components/dashboard";
+import { Timestamp } from "@/components/format";
+import { Card } from "@/components/page-header";
+import { PerformanceChart, type ChartSeries } from "@/components/performance-chart";
 import { Skeleton } from "@/components/ui/skeleton";
-import { VIEWS, VIEW_IDS, type ViewId } from "@/lib/catalog";
-import { formatHuman } from "@/lib/dates";
 import { optionalEnv } from "@/lib/env";
-import { FUND_KIND } from "@/lib/plain";
-import { metricTriples } from "@/lib/report/input";
-import { screenFund } from "@/lib/report/screening";
 import { loadDashboard } from "@/lib/view-data";
 
-export default function Home() {
+export default function Dashboard() {
   return (
-    <Suspense fallback={<HomeSkeleton />}>
-      <SimpleHome />
+    <Suspense fallback={<DashboardSkeleton />}>
+      <DashboardContent />
     </Suspense>
   );
 }
 
-async function SimpleHome() {
+function greeting(now: Date) {
+  const h = Number(new Intl.DateTimeFormat("en-IN", { hour: "numeric", hour12: false, timeZone: "Asia/Kolkata" }).format(now));
+  return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
+}
+
+async function DashboardContent() {
   let d;
   try {
     d = await loadDashboard();
@@ -26,90 +28,87 @@ async function SimpleHome() {
     return (
       <div role="alert" className="rounded-2xl border bg-[var(--tint-critical)] p-6">
         <p className="font-medium">We couldn&apos;t load your funds right now.</p>
-        <p className="mt-1 text-sm text-[var(--ink-secondary)]">Please try again in a minute. If it keeps happening, check the Manage page.</p>
+        <p className="mt-1 text-sm text-[var(--ink-secondary)]">Please try again in a minute. If it keeps happening, check Settings.</p>
       </div>
     );
   }
+  const now = new Date();
   const name = optionalEnv("INVESTOR_NAME", "Meera");
-  const report = d.latestReport;
   const navDate = d.performance.map((p) => p.nav?.date).filter(Boolean).sort().at(-1) ?? null;
+  const short = (n: string) => n.replace(/\s*-\s*Direct Plan.*$/i, "").replace(/\s*-\s*Growth.*$/i, "");
+  const series: ChartSeries[] = [
+    ...d.performance.map((p) => ({ key: `f${p.schemeCode}`, name: short(p.schemeName), kind: "fund" as const, data: p.chart })),
+    ...d.headline.map((ix) => ({ key: ix.id, name: ix.name, kind: "index" as const, data: ix.chart })),
+  ];
+  const first = d.performance[0];
+  const initial = first ? [`f${first.schemeCode}`, first.benchmark?.id ?? "NIFTY50"] : ["NIFTY50"];
 
   return (
     <div className="space-y-8">
-      {report ? (
-        <VerdictHero name={name} label={report.assessment} reason={report.assessmentReason} weekEnding={report.weekEnding} reportId={report.id} />
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+          {greeting(now)}, {name}.
+        </h1>
+        <p className="mt-1 text-[var(--ink-secondary)]">Here is how your investments are doing this week.</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" })}
+          {d.lastRefresh && (
+            <>
+              {" "}
+              · data last refreshed <Timestamp iso={d.lastRefresh.finishedAt} />
+            </>
+          )}
+        </p>
+      </div>
+
+      <PortfolioCards portfolio={d.portfolio} admin={d.admin} fundsTracked={d.performance.length} navDate={navDate} />
+
+      {d.latestReport ? (
+        <AssessmentPanel label={d.latestReport.assessment} reason={d.latestReport.assessmentReason} weekEnding={d.latestReport.weekEnding} reportId={d.latestReport.id} funds={d.performance} />
       ) : (
-        <section className="rounded-2xl border bg-card p-6">
-          <p className="text-sm text-[var(--ink-secondary)]">Hi {name}</p>
-          <h1 className="mt-2 text-2xl font-semibold">Your first weekly report arrives on Saturday morning.</h1>
-        </section>
+        <Card>
+          <p className="font-medium">Your first weekly assessment arrives on Saturday morning.</p>
+        </Card>
       )}
 
       <section>
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-lg font-semibold">Your {d.performance.length} funds</h2>
-          {navDate && <p className="text-sm text-muted-foreground">Latest prices from {formatHuman(navDate)}</p>}
+          <h2 className="text-lg font-semibold">Your funds at a glance</h2>
+          <p className="text-xs text-muted-foreground">Returns from published NAVs. &ldquo;Similar funds&rdquo; = average of comparable Direct-Growth funds.</p>
         </div>
-        {d.performance.length === 0 ? (
-          <p className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">
-            No funds yet. <Link href="/manage" className="underline">Add one using its scheme code</Link>.
-          </p>
-        ) : (
-          <div className="grid gap-4 md:grid-cols-2">
-            {d.performance.map((p) => {
-              const status = !p.nav ? "delayed" : screenFund(p.viewId, metricTriples(p)).flag ? "watch" : "ok";
-              const why = report?.report.output.funds.find((f) => f.schemeCode === p.schemeCode);
-              return <FundCard key={p.schemeCode} perf={p} status={status} why={why} />;
-            })}
-          </div>
-        )}
-        <p className="mt-3 text-xs text-muted-foreground">
-          &ldquo;On track&rdquo; means no lasting slip against similar funds; one bad week alone never changes it. Comparisons are for this week.{" "}
-          <Link href="/methodology" className="underline">How we decide</Link>
-        </p>
+        <FundSummary funds={d.performance} />
       </section>
 
-      <MarketStrip indices={d.headline} summary={report?.report.output.marketSummary.text} />
+      <Card>
+        <h2 className="text-lg font-semibold">How they have moved</h2>
+        <p className="mb-4 text-sm text-[var(--ink-secondary)]">Pick funds or indices and a period; all lines start at ₹100 on the same day.</p>
+        <PerformanceChart series={series} initial={initial} />
+      </Card>
 
       <section>
-        <h2 className="mb-3 text-lg font-semibold">Explore by fund type</h2>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          {VIEW_IDS.map((id: ViewId) => {
-            const c = report?.report.output.categories.find((x) => x.viewId === id);
-            return (
-              <Link key={id} href={`/categories/${id}`} className="rounded-xl border bg-card p-4 hover:border-foreground/30">
-                <div className="text-sm font-semibold">{VIEWS[id].title}</div>
-                <div className="mt-1 text-xs leading-relaxed text-muted-foreground">{c?.headline ?? FUND_KIND[id]}</div>
-              </Link>
-            );
-          })}
-        </div>
+        <h2 className="mb-3 text-lg font-semibold">What matters this week</h2>
+        <Highlights items={d.highlights} />
       </section>
 
-      <nav aria-label="More" className="flex flex-wrap gap-x-6 gap-y-2 border-t pt-5 text-sm">
-        <Link href="/details" className="font-medium hover:underline">
-          Detailed numbers →
-        </Link>
-        <Link href="/reports" className="hover:underline">
-          Past weekly reports
-        </Link>
-        <Link href="/methodology" className="hover:underline">
-          How we calculate
-        </Link>
-      </nav>
+      <section>
+        <h2 className="mb-3 text-lg font-semibold">Quick actions</h2>
+        <QuickActions reportId={d.latestReport?.id ?? null} />
+      </section>
     </div>
   );
 }
 
-function HomeSkeleton() {
+function DashboardSkeleton() {
   return (
-    <div className="space-y-6" aria-busy="true" aria-label="Loading">
-      <Skeleton className="h-44 w-full rounded-2xl" />
-      <div className="grid gap-4 md:grid-cols-2">
-        {Array.from({ length: 4 }, (_, i) => (
-          <Skeleton key={i} className="h-56 rounded-2xl" />
+    <div className="space-y-6" aria-busy="true" aria-label="Loading your dashboard">
+      <Skeleton className="h-16 w-72" />
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        {Array.from({ length: 5 }, (_, i) => (
+          <Skeleton key={i} className="h-20 rounded-xl" />
         ))}
       </div>
+      <Skeleton className="h-44 w-full rounded-2xl" />
+      <Skeleton className="h-72 w-full rounded-2xl" />
     </div>
   );
 }

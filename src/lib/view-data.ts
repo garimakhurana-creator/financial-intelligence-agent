@@ -1,7 +1,11 @@
 import { connection } from "next/server";
 import { INDICES, VIEWS, type IndexId, type ViewId } from "@/lib/catalog";
-import { todayIn } from "@/lib/dates";
+import { addDays, todayIn } from "@/lib/dates";
+import { isAdmin } from "@/lib/auth";
 import * as repo from "@/lib/db/repo";
+import * as research from "@/lib/db/research";
+import { weeklyHighlights } from "@/lib/highlights";
+import { summarisePortfolio } from "@/lib/portfolio";
 import { integrationStatus, REPORT_TZ } from "@/lib/env";
 import { syncEmailStatuses } from "@/lib/delivery/deliver";
 import { buildFundPerformance, buildIndexPerformance, buildIndexSet, getIndexSeries, historyStart, type FundPerformance, type StoredPeerStats } from "@/lib/pipeline/data";
@@ -15,17 +19,24 @@ import type { IndexSnapshot } from "@/lib/sources/nse";
 export async function loadDashboard() {
   await connection();
   const asOf = todayIn(REPORT_TZ());
-  const funds = await repo.listFunds({ activeOnly: true });
-  const [performance, headline, snapshot, latestReportMeta, runs] = await Promise.all([
+  const [funds, admin] = await Promise.all([repo.listFunds({ activeOnly: true }), isAdmin()]);
+  const [performance, headline, fx, snapshot, latestReportMeta, runs, recentNews, holdings] = await Promise.all([
     Promise.all(funds.map((f) => buildFundPerformance(f, asOf))),
     Promise.all((["NIFTY50", "NIFTY_MIDCAP150", "NIFTY_SMALLCAP100"] as IndexId[]).map((id) => buildIndexPerformance(id, asOf))),
+    buildIndexSet(["NASDAQ100", "USDINR"], asOf).then((s) => s.find((i) => i.id === "USDINR") ?? null),
     repo.getLatestMarketSnapshot<IndexSnapshot[]>(),
     repo.listReports(1),
     repo.listRuns(5),
+    repo.listNewsSince(addDays(asOf, -7) + "T00:00:00.000Z", 200).catch(() => []),
+    admin ? research.listHoldings().catch(() => []) : Promise.resolve([]),
   ]);
   const latestReport = latestReportMeta[0] ? await repo.getReport<ReportPayload, ReportInput>(latestReportMeta[0].id) : null;
   const news = latestReport ? latestReport.report.news.slice(0, 6) : [];
-  return { asOf, funds, performance, headline, snapshot, latestReport, news, runs, integrations: integrationStatus() };
+  const withPeer = performance.map((p, i) => ({ ...p, peerKey: funds[i].peerKey }));
+  const portfolio = admin ? summarisePortfolio(holdings, withPeer) : null;
+  const highlights = weeklyHighlights({ funds: performance, indices: headline, fx, news: recentNews });
+  const lastRefresh = runs.find((r) => r.status !== "running" && r.finishedAt) ?? null;
+  return { asOf, admin, funds, performance, headline, snapshot, latestReport, news, runs, lastRefresh, portfolio, highlights, integrations: integrationStatus() };
 }
 
 export async function loadFund(schemeCode: number) {
@@ -80,4 +91,15 @@ export async function loadManage() {
   await connection();
   const [funds, runs, reports] = await Promise.all([repo.listFunds(), repo.listRuns(15), repo.listReports(10)]);
   return { funds, runs, reports, integrations: integrationStatus() };
+}
+
+export async function loadPortfolio() {
+  await connection();
+  const asOf = todayIn(REPORT_TZ());
+  const [funds, admin] = await Promise.all([repo.listFunds({ activeOnly: true }), isAdmin()]);
+  const performance = await Promise.all(funds.map((f) => buildFundPerformance(f, asOf)));
+  const holdings = admin ? await research.listHoldings().catch(() => []) : [];
+  const withPeer = performance.map((p, i) => ({ ...p, peerKey: funds[i].peerKey }));
+  const portfolio = admin ? summarisePortfolio(holdings, withPeer) : null;
+  return { asOf, admin, funds, performance, holdings, portfolio };
 }
