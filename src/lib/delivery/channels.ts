@@ -61,6 +61,75 @@ export function templateText(s: string, max = 900): string {
   return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
 }
 
+/**
+ * Body of the PDF template (WHATSAPP_PDF_TEMPLATE_NAME), exactly as submitted to Meta. The PDF holds
+ * the full report; the message itself carries the key insights: the overall assessment with its
+ * reason, one line per fund for the week, and the market in a sentence or two.
+ */
+export const WHATSAPP_PDF_BODY =
+  "Hi {{1}}, here is your weekly mutual fund report for the week ending {{2}}.\n\n*Overall:* {{3}}\n\n*Your funds this week:* {{4}}\n\n*The market:* {{5}}\n\nThe full report is attached as a PDF. Sources and charts: {{6}}\n\nThis is a monitoring summary, not investment advice.";
+
+/** WhatsApp caps a template body at 1,024 characters once the parameters are filled in. */
+export const WHATSAPP_BODY_LIMIT = 1024;
+
+const FUND_EMOJI_BY_VIEW: Record<string, string> = { large_cap_index: "🏢", mid_cap: "🚀", small_cap: "🌱", short_debt: "🛟", intl_fof: "🌎" };
+const waName = (n: string) =>
+  n
+    .replace(/\s*-\s*Direct Plan.*$/i, "")
+    .replace(/\s+US Specific Equity Passive FOF$/i, "")
+    .replace(/\s+Fund$/i, "")
+    .trim();
+const signedPct = (n: number | null | undefined) => {
+  if (n === null || n === undefined) return "n/a";
+  const r = Math.round(n * 100) / 100;
+  return `${r > 0 ? "+" : ""}${(r === 0 ? 0 : r).toFixed(2)}%`;
+};
+
+/** "🚀 HDFC Mid Cap +0.17% (ahead of similar funds)" — one per fund, joined on one line. */
+export function fundsLine(report: StoredWeeklyReport): string {
+  return report.report.funds
+    .map((f) => {
+      const w = f.windows["1W"];
+      const gap = w.vsPeerPp;
+      const words =
+        gap === null ? "" : Math.abs(gap) < 0.1 ? " (in line with similar funds)" : Math.abs(gap) < 1 ? (gap > 0 ? " (slightly ahead of similar funds)" : " (slightly behind similar funds)") : gap > 0 ? " (ahead of similar funds)" : " (behind similar funds)";
+      return `${FUND_EMOJI_BY_VIEW[f.viewId ?? ""] ?? "•"} ${waName(f.schemeName)} ${signedPct(w.fund.returnPct)}${words}`;
+    })
+    .join(" · ");
+}
+
+/** Whole sentences from the start of `text` that fit in `max` characters (at least the first, trimmed). */
+function sentencesWithin(text: string, max: number): string {
+  const parts = text.replace(/\s+/g, " ").trim().split(/(?<=[.!?])\s+/);
+  let out = "";
+  for (const s of parts) {
+    const next = out ? `${out} ${s}` : s;
+    if (next.length > max) break;
+    out = next;
+  }
+  return out || templateText(parts[0], max);
+}
+
+/** Parameters for WHATSAPP_PDF_BODY, sized so the rendered message stays within WhatsApp's limit. */
+export function whatsappPdfParams(report: StoredWeeklyReport, reportUrl: string, opts: { isTest: boolean }): string[] {
+  const out = report.report.output;
+  const name = report.inputSnapshot.investorName;
+  const week = formatHuman(report.weekEnding);
+  const [firstSentence, ...rest] = out.assessment.reason.trim().split(/(?<=[.!?])\s+/);
+  const labelStart = out.assessment.label.toLowerCase().split(" ").slice(0, 2).join(" ");
+  const reason = rest.length && firstSentence.toLowerCase().includes(labelStart) ? rest.join(" ") : out.assessment.reason;
+  const overall = templateText(`${opts.isTest ? "[TEST] " : ""}${out.assessment.label}. ${reason}`, 420);
+  const funds = templateText(fundsLine(report), 330);
+  const fixed = WHATSAPP_PDF_BODY.replace(/\{\{\d\}\}/g, "").length + name.length + week.length + overall.length + funds.length + reportUrl.length;
+  const market = sentencesWithin(out.marketSummary.text, Math.max(80, WHATSAPP_BODY_LIMIT - fixed - 40));
+  return [name, week, overall, funds, templateText(market, 400), reportUrl];
+}
+
+/** The message as WhatsApp will show it (for previews and tests). */
+export function renderWhatsAppBody(params: string[]): string {
+  return WHATSAPP_PDF_BODY.replace(/\{\{(\d)\}\}/g, (_, i) => params[Number(i) - 1] ?? "");
+}
+
 /** Link to the report's PDF (public route), used as the WhatsApp document header. */
 export function reportPdfUrl(reportUrl: string): string {
   return `${reportUrl.replace(/\/reports\//, "/api/reports/")}/pdf`;
@@ -126,22 +195,30 @@ export async function sendWhatsApp(report: StoredWeeklyReport, reportUrl: string
   };
   const recipientMasked = maskPhone(env.WHATSAPP_RECIPIENT_NUMBER);
 
-  const pdfTemplate = process.env.WHATSAPP_PDF_TEMPLATE_NAME?.trim();
-  if (pdfTemplate) {
-    const header = {
-      type: "header",
-      parameters: [{ type: "document", document: { link: reportPdfUrl(reportUrl), filename: `fund-report-${report.weekEnding}.pdf` } }],
-    };
+  // Try templates from richest to simplest; Meta rejects one that isn't approved (nothing is sent),
+  // so the first usable one wins. Any other error stops here, so a message is never sent twice.
+  const header = {
+    type: "header",
+    parameters: [{ type: "document", document: { link: reportPdfUrl(reportUrl), filename: `fund-report-${report.weekEnding}.pdf` } }],
+  };
+  const richBody = { type: "body", parameters: whatsappPdfParams(report, reportUrl, opts).map((t) => ({ type: "text", text: t })) };
+  const attempts = [
+    { name: process.env.WHATSAPP_PDF_TEMPLATE_NAME?.trim(), components: [header, richBody], detail: "sent with key insights and the PDF report attached" },
+    { name: process.env.WHATSAPP_PDF_TEMPLATE_SHORT?.trim(), components: [header, body], detail: "sent with the PDF report attached (short message — the richer template is not approved yet)" },
+    { name: env.WHATSAPP_TEMPLATE_NAME, components: [body], detail: "PDF templates not approved yet — sent the summary with the report link" },
+  ].filter((a): a is { name: string; components: typeof a.components; detail: string } => Boolean(a.name));
+
+  for (const [i, a] of attempts.entries()) {
     try {
-      const id = await postTemplate(env, to, { name: pdfTemplate, language, components: [header, body] });
-      return { providerMessageId: id, recipientMasked, detail: "sent with the PDF report attached" };
+      const id = await postTemplate(env, to, { name: a.name, language, components: a.components });
+      return { providerMessageId: id, recipientMasked, detail: i === attempts.length - 1 && attempts.length === 1 ? undefined : a.detail };
     } catch (e) {
-      if (!(e instanceof WhatsAppApiError && e.code !== undefined && TEMPLATE_UNUSABLE.has(e.code))) throw e;
-      log.warn("whatsapp.pdf_template_unusable", { template: pdfTemplate, error: e.message });
+      const last = i === attempts.length - 1;
+      if (last || !(e instanceof WhatsAppApiError && e.code !== undefined && TEMPLATE_UNUSABLE.has(e.code))) throw e;
+      log.warn("whatsapp.template_unusable", { template: a.name, error: e.message });
     }
   }
-  const id = await postTemplate(env, to, { name: env.WHATSAPP_TEMPLATE_NAME, language, components: [body] });
-  return { providerMessageId: id, recipientMasked, detail: pdfTemplate ? "PDF template not approved yet — sent the summary with the report link" : undefined };
+  throw new Error("No WhatsApp template configured");
 }
 
 // ---------------------------------------------------------------------------------------------

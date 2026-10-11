@@ -65,7 +65,12 @@ Test sends (report page → owner only, or `scripts/send-test.ts`) get a fresh `
 Implemented (`sendWhatsApp`, `/api/webhooks/whatsapp`) and reporting `awaiting_configuration` until set up.
 
 - Business-initiated messages outside a 24-hour customer-service window must use an **approved template**.
-- **Full report as a PDF** (preferred): template `weekly_fund_report_pdf` (`WHATSAPP_PDF_TEMPLATE_NAME`) has a
+- **Key insights + PDF** (preferred, 2026-10-12): template `weekly_fund_report_pdf_v2` (`WHATSAPP_PDF_TEMPLATE_NAME`,
+  id 1107932945503229) attaches the PDF and puts the key insights in the message itself — the overall verdict with
+  its reason, one line per fund for the week (e.g. "🚀 HDFC Mid Cap +0.17% (slightly ahead of similar funds)") and
+  the market in a sentence or two — sized to stay under WhatsApp's 1,024-character body limit (`whatsappPdfParams`).
+  Senders try this, then the short PDF template (`WHATSAPP_PDF_TEMPLATE_SHORT`), then the text template.
+- **Short PDF template**: `weekly_fund_report_pdf` has a
   DOCUMENT header, filled with the report's public PDF link `/api/reports/<id>/pdf` — the same content and order as
   the email: three sentences per fund, the market, then the closing overall assessment. Body:
   `Hi {{1}}, your weekly mutual fund report for the week ending {{2}} is attached as a PDF. Overall: {{3}}. Full report with sources: {{4}} (monitoring summary, not investment advice).`
