@@ -23,4 +23,4 @@ export const POST = adminRoute(async (req: Request) => {
   }
   const { id, report } = await createWeeklyReport({ kind: "manual", reuseNews });
   return json({ id, generator: report.generator, model: report.model, notes }, 201);
-});
+}, { name: "generate", max: 6, windowMs: 60 * 60_000 });

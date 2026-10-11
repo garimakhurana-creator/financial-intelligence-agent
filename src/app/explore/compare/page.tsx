@@ -8,7 +8,7 @@ import { groupLabelMap, toUniverseRow, type UniverseRow } from "@/lib/explore";
 import type { DiscoveryFundData, DiscoveryGroupData } from "@/lib/pipeline/discovery";
 import { cn } from "@/lib/utils";
 
-export const metadata = { title: "Compare funds · Meera's Fund Intelligence" };
+export const metadata = { title: "Compare funds · Meera's Money" };
 
 export default function ComparePage({ searchParams }: PageProps<"/explore/compare">) {
   return (

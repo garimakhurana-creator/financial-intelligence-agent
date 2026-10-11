@@ -85,7 +85,8 @@ Missing data shows as unavailable with a reason.
 
 **17. How are secrets and endpoints protected?**
 All keys are server-only environment variables, never in the browser or git. Cron routes need the cron secret;
-owner actions need a signed httpOnly session cookie from the admin password, with login rate-limiting; the
+the app is for one person, so by default there is no sign-in, but every action is rate-limited per IP (sends and
+job runs are limited most tightly), and ACCESS_MODE=password brings back a signed httpOnly session cookie; the
 WhatsApp webhook verifies Meta's HMAC signature. Recipient addresses are masked in logs and UI.
 
 **18. How would it scale?**
@@ -144,3 +145,18 @@ research reports. They are separate tables, so a watchlisted fund is never count
 **27. What does "What matters this week" use?**
 Fixed rules: a flagged fund, an index moving 2%+ in a week, the rupee moving 1%+, interest-rate news, or a fund 1.5+
 points behind similar funds over a month. At most three, each linked to its evidence.
+
+**28. How does the assistant avoid making things up?**
+It gets only the app's own data as context: fund metrics, statuses, report summaries, indices, news with ids, the
+Explore shortlist, holdings and the glossary. The same checks used for the weekly report then run on its answer:
+every number must appear in that context, buy/sell advice is refused, and links must point to real pages. A failed
+answer is retried once, then replaced with a safe fallback.
+
+**29. Why no sign-in?**
+The product has one user, Meera, and a password gate added friction to every page. Open mode keeps the deployment
+simple; per-IP rate limits cap misuse, and one environment variable (ACCESS_MODE=password) restores the gate.
+
+**30. How do the glossary and dark mode work?**
+The glossary is a typed list of about 50 terms. A <Term> component underlines a word, shows the short definition on
+hover and links to the full entry. Dark mode swaps CSS colour tokens under a data-theme attribute; a tiny inline
+script applies the saved choice before the first paint, so the page never flashes the wrong theme.

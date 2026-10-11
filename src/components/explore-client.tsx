@@ -7,6 +7,7 @@ import { Bookmark, BookmarkCheck, FileSearch, Scale, Search, X } from "lucide-re
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Term } from "@/components/term";
 import type { UniverseRow } from "@/lib/explore";
 import { cn } from "@/lib/utils";
 
@@ -55,7 +56,7 @@ function CompareBar({ sel, rows, clear, toggle }: { sel: number[]; rows: Univers
           Clear
         </Button>
         {sel.length >= 2 ? (
-          <Link href={`/explore/compare?codes=${sel.join(",")}`} className="rounded-lg bg-foreground px-3 py-1.5 text-sm font-medium text-background">
+          <Link href={`/explore/compare?codes=${sel.join(",")}`} className="rounded-lg bg-brand text-white dark:text-[var(--page)] px-3 py-1.5 text-sm font-medium">
             Compare side by side
           </Link>
         ) : (
@@ -70,12 +71,7 @@ function WatchButton({ code, watched, admin }: { code: number; watched: boolean;
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  if (!admin)
-    return (
-      <Link href="/manage" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:underline" title="Sign in to use the watchlist">
-        <Bookmark className="size-3.5" aria-hidden /> Watchlist
-      </Link>
-    );
+  if (!admin) return null;
   return (
     <span className="inline-flex items-center gap-1">
       <button
@@ -134,7 +130,7 @@ export function FundCardExplore({ r, watched, admin, selected, onCompare, why }:
       </dl>
       <ul className="mt-3 space-y-0.5 text-xs text-[var(--ink-secondary)]">
         <li>
-          3 yrs vs category median: <span className={cn("tabular", tone(r.vsCat3))}>{r.vsCat3 === null ? "n/a" : `${r.vsCat3 > 0 ? "+" : ""}${r.vsCat3.toFixed(2)} pts`}</span>
+          3 yrs vs <Term slug="category-median">category median</Term>: <span className={cn("tabular", tone(r.vsCat3))}>{r.vsCat3 === null ? "n/a" : `${r.vsCat3 > 0 ? "+" : ""}${r.vsCat3.toFixed(2)} pts`}</span>
           {r.vsRef3 !== null && (
             <>
               {" "}
@@ -143,7 +139,7 @@ export function FundCardExplore({ r, watched, admin, selected, onCompare, why }:
           )}
         </li>
         <li>
-          Worst fall (3 yrs): <span className="tabular">{r.dd === null ? "n/a" : `${r.dd.toFixed(2)}%`}</span> · beat category median in {r.cons === null ? "n/a" : `${r.cons}%`} of 1-yr periods
+          <Term slug="drawdown">Worst fall</Term> (3 yrs): <span className="tabular">{r.dd === null ? "n/a" : `${r.dd.toFixed(2)}%`}</span> · beat category median in {r.cons === null ? "n/a" : `${r.cons}%`} of 1-yr periods
         </li>
         <li>
           Typical risk for this category: {r.riskBand} · horizon {r.horizon} · expense ratio: not in our data — check the factsheet
@@ -411,7 +407,7 @@ export function PreferencesForm({
                 type="button"
                 aria-pressed={on}
                 onClick={() => setV({ ...v, preferredGroups: on ? v.preferredGroups.filter((x) => x !== g.key) : [...v.preferredGroups, g.key] })}
-                className={cn("rounded-full border px-2.5 py-1 text-xs", on ? "border-foreground bg-foreground text-background" : "hover:bg-muted")}
+                className={cn("rounded-full border px-2.5 py-1 text-xs", on ? "border-brand bg-brand text-white dark:text-[var(--page)]" : "hover:bg-muted")}
               >
                 {g.label}
               </button>

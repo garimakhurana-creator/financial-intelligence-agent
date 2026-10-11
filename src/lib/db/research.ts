@@ -263,12 +263,13 @@ export async function getAnalysis<D>(id: string): Promise<StoredAnalysis<D> | nu
     : null;
 }
 
+/** The owner's saved analyses (visitor runs, marked with a "v-" source type, are excluded). */
 export async function listAnalyses(limit = 50) {
   const { db, databaseId } = appwrite();
   const page = await db.listRows({
     databaseId,
     tableId: "fund_analyses",
-    queries: [Query.orderDesc("created_at"), Query.limit(limit), Query.select(["$id", "scheme_code", "scheme_name", "source_type", "outcome", "created_at"])],
+    queries: [Query.notStartsWith("source_type", "v-"), Query.orderDesc("created_at"), Query.limit(limit), Query.select(["$id", "scheme_code", "scheme_name", "source_type", "outcome", "created_at"])],
     total: false,
   });
   return page.rows.map((r) => ({

@@ -3,7 +3,7 @@ import { SectionTitle } from "@/components/blocks";
 import { Timestamp } from "@/components/format";
 import { LoginForm, LogoutButton, ManagePanel } from "@/components/manage-panel";
 import { Skeleton } from "@/components/ui/skeleton";
-import { isAdmin } from "@/lib/auth";
+import { isAdmin, openAccess } from "@/lib/auth";
 import { INDICES, PEER_RULES, VIEWS } from "@/lib/catalog";
 import { loadManage } from "@/lib/view-data";
 import { cn } from "@/lib/utils";
@@ -14,7 +14,7 @@ export default function ManagePage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight">Settings &amp; funds</h1>
         <p className="mt-1 text-sm text-[var(--ink-secondary)]">
-          Owner sign-in, tracked funds and their benchmark/peer mapping, on-demand reports and data refreshes, integration status and run history. Holdings and SIPs are on My Portfolio.
+          Tracked funds and their benchmark/peer mapping, on-demand reports and data refreshes, integration status and run history. Holdings and SIPs are on My Portfolio.
         </p>
       </div>
       <Suspense fallback={<Skeleton className="h-96 w-full rounded-xl" />}>
@@ -35,13 +35,17 @@ async function Manage() {
     <div className="space-y-8">
       {admin ? (
         <>
-          <div className="flex justify-end">
-            <LogoutButton />
-          </div>
+          {!openAccess() && (
+            <div className="flex justify-end">
+              <LogoutButton />
+            </div>
+          )}
           <ManagePanel funds={d.funds} options={options} />
         </>
       ) : (
-        <LoginForm />
+        <div id="sign-in">
+          <LoginForm />
+        </div>
       )}
 
       <section>

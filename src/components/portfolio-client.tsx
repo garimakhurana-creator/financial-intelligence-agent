@@ -95,7 +95,7 @@ export function ComparisonTable({ rows }: { rows: CompareRow[] }) {
           <span className="text-xs font-medium">Compare over</span>
           <div role="group" aria-label="Comparison period" className="flex rounded-lg border bg-background p-0.5">
             {(["1W", "1M", "YTD"] as const).map((p) => (
-              <button key={p} type="button" aria-pressed={period === p} onClick={() => setPeriod(p)} className={cn("rounded-md px-2.5 py-1 text-xs font-medium", period === p ? "bg-foreground text-background" : "hover:bg-muted")}>
+              <button key={p} type="button" aria-pressed={period === p} onClick={() => setPeriod(p)} className={cn("rounded-md px-2.5 py-1 text-xs font-medium", period === p ? "bg-brand text-white dark:text-[var(--page)]" : "hover:bg-muted")}>
                 {p === "1W" ? "Week" : p === "1M" ? "Month" : "This year"}
               </button>
             ))}

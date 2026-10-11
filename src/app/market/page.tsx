@@ -1,3 +1,4 @@
+import { Newspaper } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
 import { Sparkline } from "@/components/charts";
@@ -12,12 +13,13 @@ import { signed, toneOf } from "@/lib/plain";
 import { cn } from "@/lib/utils";
 import { loadMarket } from "@/lib/view-data";
 
-export const metadata = { title: "Market & News · Meera's Fund Intelligence" };
+export const metadata = { title: "Market & News · Meera's Money" };
 
 export default function MarketPage({ searchParams }: PageProps<"/market">) {
   return (
     <>
       <PageHeader
+        icon={Newspaper}
         title="Market & News"
         sub="How the main indices moved, what happened in the economy, and the news that may matter for your kind of funds — with sources."
         crumbs={[{ href: "/", label: "Dashboard" }]}

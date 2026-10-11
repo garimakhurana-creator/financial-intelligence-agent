@@ -5,7 +5,7 @@ import { AppNav, AppNavFallback } from "@/components/app-nav";
 import { AssistantLauncher } from "@/components/assistant";
 import { THEME_SCRIPT } from "@/components/theme";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { isAdmin } from "@/lib/auth";
+import { isAdmin, openAccess } from "@/lib/auth";
 import "./globals.css";
 
 const geistSans = Geist({ variable: "--font-sans", subsets: ["latin"] });
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 
 /** Session cookie is request-time data, so the nav that depends on it streams inside Suspense. */
 async function NavWithSession() {
-  return <AppNav admin={await isAdmin()} />;
+  return <AppNav admin={await isAdmin()} showAccount={!openAccess()} />;
 }
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

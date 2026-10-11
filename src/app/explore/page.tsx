@@ -1,18 +1,20 @@
+import { Compass } from "lucide-react";
 import Link from "next/link";
 import { Suspense } from "react";
-import { Card, Explain, PageHeader, SignInPrompt } from "@/components/page-header";
+import { Card, Explain, PageHeader } from "@/components/page-header";
 import { ExploreWorkspace, PreferencesForm } from "@/components/explore-client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DISCOVERY_GROUPS } from "@/lib/catalog";
 import { shortlist } from "@/lib/explore";
 import { loadExplore } from "@/lib/view-data";
 
-export const metadata = { title: "Explore Funds · Meera's Fund Intelligence" };
+export const metadata = { title: "Explore Funds · Meera's Money" };
 
 export default function ExplorePage() {
   return (
     <>
       <PageHeader
+        icon={Compass}
         title="Explore Funds"
         sub="Research funds you might add as a future SIP. This compares track records within each category — it does not predict or guarantee future returns."
         crumbs={[{ href: "/", label: "Dashboard" }]}
@@ -46,19 +48,18 @@ async function Explore() {
 
   return (
     <div className="space-y-8">
+      {d.admin && (
       <Card>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-lg font-semibold">Your SIP preferences</h2>
           <span className="text-xs text-muted-foreground">Optional · shapes the shortlist below</span>
         </div>
         <div className="mt-3">
-          {d.admin ? (
+          {(
             <PreferencesForm
               initial={d.prefs ?? { goal: null, horizonYears: null, monthlyBudget: null, riskComfort: null, preferredGroups: [] }}
               groups={groups}
             />
-          ) : (
-            <SignInPrompt what="save SIP preferences and use the watchlist" />
           )}
         </div>
         {s.notes.length > 0 && (
@@ -69,6 +70,8 @@ async function Explore() {
           </ul>
         )}
       </Card>
+
+      )}
 
       {d.admin && d.watch.length > 0 && (
         <Card>

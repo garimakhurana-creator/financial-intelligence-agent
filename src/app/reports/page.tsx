@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Suspense } from "react";
-import { AlertTriangle, CheckCircle2, Eye } from "lucide-react";
+import { AlertTriangle, BookOpen, CheckCircle2, Eye } from "lucide-react";
 import { Timestamp } from "@/components/format";
 import { PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -8,12 +8,13 @@ import { formatHuman } from "@/lib/dates";
 import { loadArchive } from "@/lib/view-data";
 import { cn } from "@/lib/utils";
 
-export const metadata = { title: "Weekly Reports · Meera's Fund Intelligence" };
+export const metadata = { title: "Weekly Reports · Meera's Money" };
 
 export default function ReportsPage() {
   return (
     <>
       <PageHeader
+        icon={BookOpen}
         title="Weekly Reports"
         sub="Every Saturday report, kept with the exact data it was written from. Opening an old report never refreshes or changes it."
         crumbs={[{ href: "/", label: "Dashboard" }]}

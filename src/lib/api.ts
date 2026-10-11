@@ -1,4 +1,4 @@
-import { isAdmin } from "@/lib/auth";
+import { clientIp, isAdmin, rateLimit } from "@/lib/auth";
 import { MissingConfigError } from "@/lib/env";
 import { errorMessage, log } from "@/lib/log";
 import { FundInputError } from "@/lib/pipeline/funds";
@@ -7,10 +7,17 @@ export function json(data: unknown, status = 200) {
   return Response.json(data, { status, headers: { "Cache-Control": "no-store" } });
 }
 
-/** Wrap an admin-only route handler: 401 without a session; known errors become clean 4xx. */
-export function adminRoute<A extends unknown[]>(handler: (...args: A) => Promise<Response>) {
+/**
+ * Wrap an owner action: 401 without access (only when ACCESS_MODE=password), a per-IP rate limit
+ * (stricter for sends and jobs), and known errors as clean 4xx responses.
+ */
+export function adminRoute<A extends unknown[]>(handler: (...args: A) => Promise<Response>, limit: { name: string; max: number; windowMs: number } = { name: "write", max: 120, windowMs: 60 * 60_000 }) {
   return async (...args: A): Promise<Response> => {
     if (!(await isAdmin())) return json({ error: "Sign in as the owner to do this." }, 401);
+    const req = args[0] instanceof Request ? args[0] : null;
+    if (req && !rateLimit(`${limit.name}:${clientIp(req)}`, limit.max, limit.windowMs)) {
+      return json({ error: "Too many requests — please wait a little and try again." }, 429);
+    }
     return handle(() => handler(...args));
   };
 }

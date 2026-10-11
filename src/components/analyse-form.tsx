@@ -212,7 +212,7 @@ export function AnalyseForm({ initialCode }: { initialCode: string | null }) {
               setMode(t.id);
               setErr(null);
             }}
-            className={cn("flex items-center gap-2 rounded-xl border px-4 py-3 text-left text-sm font-medium", mode === t.id ? "border-foreground bg-foreground text-background" : "bg-card hover:bg-muted")}
+            className={cn("flex items-center gap-2 rounded-xl border px-4 py-3 text-left text-sm font-medium", mode === t.id ? "border-brand bg-brand text-white dark:text-[var(--page)]" : "bg-card hover:bg-muted")}
           >
             <t.Icon className="size-4" aria-hidden />
             {t.label}

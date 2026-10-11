@@ -125,7 +125,7 @@ function Account({ admin }: { admin: boolean | null }) {
   );
 }
 
-function NavShell({ pathname, admin }: { pathname: string | null; admin: boolean | null }) {
+function NavShell({ pathname, admin, showAccount = false }: { pathname: string | null; admin: boolean | null; showAccount?: boolean }) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
@@ -135,7 +135,7 @@ function NavShell({ pathname, admin }: { pathname: string | null; admin: boolean
 
   const footer = (
     <div className="space-y-3 border-t pt-4">
-      <Account admin={admin} />
+      {showAccount && <Account admin={admin} />}
       <div className="flex items-center justify-between gap-2 px-1">
         <span className="text-xs text-[var(--ink-muted)]">Theme</span>
         <ThemeToggle compact />
@@ -180,15 +180,15 @@ function NavShell({ pathname, admin }: { pathname: string | null; admin: boolean
   );
 }
 
-function ActiveNav({ admin }: { admin: boolean }) {
-  return <NavShell pathname={usePathname()} admin={admin} />;
+function ActiveNav({ admin, showAccount }: { admin: boolean; showAccount: boolean }) {
+  return <NavShell pathname={usePathname()} admin={admin} showAccount={showAccount} />;
 }
 
 /** The URL is request-time data, so the active state streams in; the fallback is the same nav, neutral. */
-export function AppNav({ admin }: { admin: boolean }) {
+export function AppNav({ admin, showAccount }: { admin: boolean; showAccount: boolean }) {
   return (
-    <Suspense fallback={<NavShell pathname={null} admin={admin} />}>
-      <ActiveNav admin={admin} />
+    <Suspense fallback={<NavShell pathname={null} admin={admin} showAccount={showAccount} />}>
+      <ActiveNav admin={admin} showAccount={showAccount} />
     </Suspense>
   );
 }

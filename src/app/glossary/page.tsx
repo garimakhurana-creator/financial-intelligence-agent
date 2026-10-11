@@ -1,3 +1,4 @@
+import { BookA } from "lucide-react";
 import Link from "next/link";
 import { GlossaryBrowser } from "@/components/glossary-browser";
 import { PageHeader } from "@/components/page-header";
@@ -9,6 +10,7 @@ export default function GlossaryPage() {
   return (
     <>
       <PageHeader
+        icon={BookA}
         title="Glossary"
         sub="Every money word used in this app, explained in everyday language. Underlined words elsewhere in the app link here."
         crumbs={[{ href: "/", label: "Dashboard" }]}

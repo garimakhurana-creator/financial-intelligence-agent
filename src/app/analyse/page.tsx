@@ -1,18 +1,20 @@
+import { FileSearch } from "lucide-react";
 import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { AnalyseForm } from "@/components/analyse-form";
-import { Card, PageHeader, SignInPrompt } from "@/components/page-header";
+import { Card, PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isAdmin } from "@/lib/auth";
 import * as research from "@/lib/db/research";
 
-export const metadata = { title: "Analyse a Fund · Meera's Fund Intelligence" };
+export const metadata = { title: "Analyse a Fund · Meera's Money" };
 
 export default function AnalysePage({ searchParams }: PageProps<"/analyse">) {
   return (
     <>
       <PageHeader
+        icon={FileSearch}
         title="Analyse a Fund"
         sub="Thinking about a fund? Get an evidence-based research report: returns against similar funds, consistency, risk, costs, strengths, concerns and alternatives."
         crumbs={[{ href: "/", label: "Dashboard" }]}
@@ -36,32 +38,13 @@ async function Analyse({ searchParams }: { searchParams: PageProps<"/analyse">["
   const sp = await searchParams;
   const code = typeof sp.code === "string" && /^\d{3,7}$/.test(sp.code) ? sp.code : null;
   const admin = await isAdmin();
-  if (!admin) {
-    return (
-      <div className="space-y-6">
-        <SignInPrompt what="analyse funds and see your saved analyses" />
-        <Card>
-          <h2 className="font-semibold">What an analysis contains</h2>
-          <ol className="mt-2 list-decimal space-y-1 pl-5 text-sm text-[var(--ink-secondary)]">
-            <li>The fund at a glance — what it invests in and its role.</li>
-            <li>Historical performance against the category median and a reference index.</li>
-            <li>Consistency over rolling 1-year periods.</li>
-            <li>Risk: volatility and the worst fall.</li>
-            <li>Costs: plan type and expense ratio (from a factsheet, if uploaded).</li>
-            <li>Portfolio: holdings and sectors, only from a verified factsheet.</li>
-            <li>Strengths and concerns, each tied to evidence.</li>
-            <li>Similar funds to compare, and a research outcome.</li>
-          </ol>
-        </Card>
-      </div>
-    );
-  }
-  const history = await research.listAnalyses(30).catch(() => []);
+  const history = admin ? await research.listAnalyses(30).catch(() => []) : [];
   return (
     <div className="space-y-8">
       <Card>
         <AnalyseForm initialCode={code} />
       </Card>
+      {admin ? (
       <section>
         <h2 className="mb-3 text-lg font-semibold">Your saved analyses</h2>
         {history.length === 0 ? (
@@ -84,6 +67,11 @@ async function Analyse({ searchParams }: { searchParams: PageProps<"/analyse">["
           </ul>
         )}
       </section>
+      ) : (
+        <p className="text-sm text-[var(--ink-secondary)]">
+          Each analysis gets its own private link that you can bookmark or share. Up to 5 analyses an hour.
+        </p>
+      )}
     </div>
   );
 }

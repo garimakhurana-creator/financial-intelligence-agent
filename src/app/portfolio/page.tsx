@@ -1,6 +1,7 @@
+import { Wallet } from "lucide-react";
 import { Suspense } from "react";
 import { PortfolioCards } from "@/components/dashboard";
-import { Card, PageHeader, SignInPrompt } from "@/components/page-header";
+import { Card, PageHeader } from "@/components/page-header";
 import { ComparisonTable, FundManager, HoldingsEditor, type CompareRow } from "@/components/portfolio-client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { VIEWS, type ViewId } from "@/lib/catalog";
@@ -9,12 +10,13 @@ import { allocation } from "@/lib/portfolio";
 import { metricTriples } from "@/lib/report/input";
 import { loadPortfolio } from "@/lib/view-data";
 
-export const metadata = { title: "My Portfolio · Meera's Fund Intelligence" };
+export const metadata = { title: "My Portfolio · Meera's Money" };
 
 export default function PortfolioPage() {
   return (
     <>
       <PageHeader
+        icon={Wallet}
         title="My Portfolio"
         sub="Your tracked funds side by side, what you actually hold, and where your money sits. Rupee amounts appear only for holdings you enter."
         crumbs={[{ href: "/", label: "Dashboard" }]}
@@ -106,32 +108,30 @@ async function Portfolio() {
         )}
       </Card>
 
+      {d.admin && (
       <section id="holdings" className="scroll-mt-20">
         <h2 className="mb-1 text-lg font-semibold">Your holdings and SIPs</h2>
         <p className="mb-3 text-sm text-[var(--ink-secondary)]">
           From your account statement (CAS) or fund app. Units × latest NAV gives the current value; gain/loss needs the amount you invested.
         </p>
-        {d.admin ? (
+        {(
           <HoldingsEditor
             rows={d.performance.map((p) => {
               const h = d.holdings.find((x) => x.schemeCode === p.schemeCode);
               return { schemeCode: p.schemeCode, name: short(p.schemeName), nav: p.nav?.value ?? null, units: h?.units ?? null, invested: h?.invested ?? null, sipAmount: h?.sipAmount ?? null, sipDay: h?.sipDay ?? null };
             })}
           />
-        ) : (
-          <SignInPrompt what="add or view your holdings and SIPs" />
         )}
       </section>
+      )}
 
+      {d.admin && (
       <section id="manage" className="scroll-mt-20">
         <h2 className="mb-1 text-lg font-semibold">Manage tracked funds</h2>
         <p className="mb-3 text-sm text-[var(--ink-secondary)]">Search by name or enter a scheme code. Removing a fund keeps its history and past reports.</p>
-        {d.admin ? (
-          <FundManager tracked={d.funds.map((f) => ({ schemeCode: f.schemeCode, name: short(f.schemeName), lastNavDate: f.lastNavDate, lastRefreshedAt: f.lastRefreshedAt }))} />
-        ) : (
-          <SignInPrompt what="add or remove tracked funds" />
-        )}
+        <FundManager tracked={d.funds.map((f) => ({ schemeCode: f.schemeCode, name: short(f.schemeName), lastNavDate: f.lastNavDate, lastRefreshedAt: f.lastRefreshedAt }))} />
       </section>
+      )}
     </div>
   );
 }

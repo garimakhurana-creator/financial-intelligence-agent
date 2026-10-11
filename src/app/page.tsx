@@ -2,6 +2,7 @@ import { Suspense } from "react";
 import { AssessmentPanel, FundSummary, Highlights, PortfolioCards, QuickActions } from "@/components/dashboard";
 import { Timestamp } from "@/components/format";
 import { Card } from "@/components/page-header";
+import { Term } from "@/components/term";
 import { PerformanceChart, type ChartSeries } from "@/components/performance-chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import { optionalEnv } from "@/lib/env";
@@ -45,12 +46,13 @@ async function DashboardContent() {
 
   return (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+      <div className="hero-wash -mx-4 -mt-6 border-b px-4 pb-7 pt-8 sm:-mx-6 sm:px-6 lg:-mx-10 lg:-mt-10 lg:px-10 lg:pt-12">
+        <p className="text-sm font-medium text-brand">{now.toLocaleDateString("en-IN", { weekday: "long", timeZone: "Asia/Kolkata" })}</p>
+        <h1 className="mt-1 text-3xl font-semibold tracking-tight sm:text-4xl">
           {greeting(now)}, {name}.
         </h1>
-        <p className="mt-1 text-[var(--ink-secondary)]">Here is how your investments are doing this week.</p>
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="mt-2 max-w-xl text-lg text-[var(--ink-secondary)]">Here is how your investments are doing this week.</p>
+        <p className="mt-2 text-xs text-muted-foreground">
           {now.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric", timeZone: "Asia/Kolkata" })}
           {d.lastRefresh && (
             <>
@@ -74,7 +76,10 @@ async function DashboardContent() {
       <section>
         <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
           <h2 className="text-lg font-semibold">Your funds at a glance</h2>
-          <p className="text-xs text-muted-foreground">Returns from published NAVs. &ldquo;Similar funds&rdquo; = average of comparable Direct-Growth funds.</p>
+          <p className="text-xs text-muted-foreground">
+            Returns from published <Term slug="nav">NAVs</Term>. <Term slug="similar-funds">&ldquo;Similar funds&rdquo;</Term> = average of comparable Direct-Growth funds; differences are in{" "}
+            <Term slug="percentage-points">points</Term>.
+          </p>
         </div>
         <FundSummary funds={d.performance} />
       </section>

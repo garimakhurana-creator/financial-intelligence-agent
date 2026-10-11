@@ -7,11 +7,13 @@ export function PageHeader({
   sub,
   crumbs,
   action,
+  icon: Icon,
 }: {
   title: React.ReactNode;
   sub?: React.ReactNode;
   crumbs?: { href: string; label: string }[];
   action?: React.ReactNode;
+  icon?: React.ComponentType<{ className?: string }>;
 }) {
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -28,7 +30,14 @@ export function PageHeader({
             ))}
           </nav>
         )}
-        <h1 className="text-2xl font-semibold tracking-tight sm:text-[1.7rem]">{title}</h1>
+        <div className="flex items-center gap-3">
+          {Icon && (
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-brand-soft text-brand">
+              <Icon className="size-5" aria-hidden />
+            </span>
+          )}
+          <h1 className="text-2xl font-semibold tracking-tight sm:text-[1.9rem]">{title}</h1>
+        </div>
         {sub && <p className="mt-1 max-w-2xl text-sm leading-relaxed text-[var(--ink-secondary)]">{sub}</p>}
       </div>
       {action && <div className="shrink-0 print:hidden">{action}</div>}
@@ -49,17 +58,5 @@ export function Explain({ label = "What does this mean?", children }: { label?: 
 }
 
 export function Card({ className = "", children }: { className?: string; children: React.ReactNode }) {
-  return <section className={`rounded-2xl border bg-card p-5 shadow-[0_1px_2px_rgba(0,0,0,0.03)] ${className}`}>{children}</section>;
-}
-
-export function SignInPrompt({ what }: { what: string }) {
-  return (
-    <div className="rounded-xl border border-dashed p-5 text-sm">
-      <p className="font-medium">Sign in to {what}.</p>
-      <p className="mt-1 text-[var(--ink-secondary)]">This is private to the account owner.</p>
-      <Link href="/manage" className="mt-3 inline-block rounded-lg bg-foreground px-3 py-1.5 text-sm font-medium text-background">
-        Sign in
-      </Link>
-    </div>
-  );
+  return <section className={`rounded-2xl border bg-card p-5 shadow-card ${className}`}>{children}</section>;
 }

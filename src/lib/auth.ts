@@ -44,7 +44,17 @@ export function checkPassword(candidate: string): boolean {
   return Boolean(pw) && safeEqual(candidate, pw!);
 }
 
+/**
+ * The app is for one person (Meera), so by default there is no sign-in: every visitor is treated
+ * as the owner. Set ACCESS_MODE=password to require ADMIN_PASSWORD again. Actions that send
+ * messages or run jobs stay rate-limited either way; cron endpoints still need CRON_SECRET.
+ */
+export function openAccess(): boolean {
+  return (process.env.ACCESS_MODE ?? "open").trim().toLowerCase() !== "password";
+}
+
 export async function isAdmin(): Promise<boolean> {
+  if (openAccess()) return true;
   const jar = await cookies();
   return verifySessionToken(jar.get(SESSION_COOKIE)?.value);
 }

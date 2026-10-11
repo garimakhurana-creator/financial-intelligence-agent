@@ -73,7 +73,7 @@ export function NewsCenter({
             type="button"
             aria-selected={topic === t.id}
             onClick={() => setTopic(t.id)}
-            className={cn("shrink-0 rounded-full border px-3 py-1.5 text-sm", topic === t.id ? "border-foreground bg-foreground text-background" : "bg-card text-[var(--ink-secondary)] hover:bg-muted")}
+            className={cn("shrink-0 rounded-full border px-3 py-1.5 text-sm", topic === t.id ? "border-brand bg-brand text-white dark:text-[var(--page)]" : "bg-card text-[var(--ink-secondary)] hover:bg-muted")}
           >
             {t.label}
           </button>

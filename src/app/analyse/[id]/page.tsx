@@ -3,15 +3,14 @@ import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { CheckCircle2, CircleAlert, Minus, Plus } from "lucide-react";
-import { Card, PageHeader, SignInPrompt } from "@/components/page-header";
+import { Card, PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
-import { isAdmin } from "@/lib/auth";
 import { HORIZONS } from "@/lib/calc/metrics";
 import * as research from "@/lib/db/research";
 import type { StoredAnalysisData } from "@/lib/analysis/analyse";
 import { cn } from "@/lib/utils";
 
-export const metadata = { title: "Fund analysis · Meera's Fund Intelligence" };
+export const metadata = { title: "Fund analysis · Meera's Money" };
 
 export default function AnalysisPage({ params }: PageProps<"/analyse/[id]">) {
   return (
@@ -73,7 +72,6 @@ async function Analysis({ params }: { params: PageProps<"/analyse/[id]">["params
   await connection();
   const { id } = await params;
   if (!/^[a-zA-Z0-9._-]{1,36}$/.test(id)) notFound();
-  if (!(await isAdmin())) return <SignInPrompt what="view saved analyses" />;
   const a = await research.getAnalysis<StoredAnalysisData>(id);
   if (!a) notFound();
   const { facts: f, narrative: n } = a.data;

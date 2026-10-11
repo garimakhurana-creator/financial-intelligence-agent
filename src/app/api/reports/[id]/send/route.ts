@@ -19,4 +19,4 @@ export const POST = adminRoute(async (req: Request, ctx: RouteContext<"/api/repo
   if (!report) return json({ error: "Report not found" }, 404);
   const outcome = await deliver(report, body.channel as Channel, { isTest: body.test !== false, retry: Boolean(body.retry) });
   return json(outcome, outcome.status === "failed" ? 502 : 200);
-});
+}, { name: "send", max: 10, windowMs: 60 * 60_000 });

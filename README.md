@@ -68,8 +68,20 @@ Pushing to `main` deploys to Vercel (functions in `bom1`, Mumbai). Crons (`verce
 
 ## Access
 
-Reading the dashboard, market, explore, reports and methodology is public. Holdings, SIP preferences, the watchlist,
-fund analyses, fund management, report generation and sends require the owner password (`ADMIN_PASSWORD`).
+This is a single-user app for Meera, so by default (`ACCESS_MODE=open`) there is no sign-in: every page and action
+is available. Every action is rate-limited per IP: 120 writes an hour in general; 10 report sends, 6 job runs and
+6 report generations an hour; 5 PDF analyses an hour and 20 assistant questions per 10 minutes. Set
+`ACCESS_MODE=password` (with `ADMIN_PASSWORD`) to bring back the owner sign-in on Settings.
+
+## Help features
+
+- **Assistant** (`/assistant` and the floating "Ask" button): Gemini answers using only the app's own data (funds,
+  market, news, Explore shortlist, holdings, glossary). Every number is checked against that data, buy/sell advice is
+  refused, and any answer that fails the checks falls back to a safe reply.
+- **Glossary** (`/glossary`): about 50 plain-language terms with examples. Underlined terms across the app show a
+  short definition on hover and link to the full entry.
+- **Dark mode**: a Light/Dark/System toggle at the bottom of the sidebar. The choice is remembered on the device and
+  applied before the first paint, so the page does not flash.
 
 ## Documentation
 

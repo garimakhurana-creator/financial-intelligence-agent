@@ -11,6 +11,18 @@ import { metricTriples } from "@/lib/report/input";
 import { screenFund, THRESHOLDS } from "@/lib/report/screening";
 import { cn } from "@/lib/utils";
 
+const CAT_DOT: Record<string, string> = {
+  large_cap_index: "var(--cat-large)",
+  mid_cap: "var(--cat-mid)",
+  small_cap: "var(--cat-small)",
+  short_debt: "var(--cat-debt)",
+  intl_fof: "var(--cat-intl)",
+};
+
+function CatDot({ view }: { view: string | null }) {
+  return <span aria-hidden className="mt-1.5 size-2.5 shrink-0 rounded-full" style={{ background: CAT_DOT[view ?? ""] ?? "var(--axis)" }} />;
+}
+
 const inr = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 const shortName = (n: string) => n.replace(/\s*-\s*Direct Plan.*$/i, "").replace(/\s*-\s*Growth.*$/i, "");
 
@@ -23,7 +35,7 @@ export function Num({ value, className }: { value: number | null | undefined; cl
 
 function SummaryCard({ label, value, sub, tone }: { label: string; value: React.ReactNode; sub?: React.ReactNode; tone?: "good" | "bad" }) {
   return (
-    <div className="rounded-xl border bg-card p-4">
+    <div className="rounded-2xl border bg-card p-4 shadow-card">
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className={cn("mt-1 text-xl font-semibold tabular", tone === "good" && "text-[var(--up)]", tone === "bad" && "text-[var(--down)]")}>{value}</div>
       {sub && <div className="mt-0.5 text-xs text-muted-foreground">{sub}</div>}
@@ -55,12 +67,14 @@ export function PortfolioCards({ portfolio, admin, fundsTracked, navDate }: { po
             <p className="mt-0.5 text-sm text-[var(--ink-secondary)]">
               {admin
                 ? "Add the units you hold, what you invested and your monthly SIPs. We never estimate these from returns."
-                : "Portfolio amounts are private. Sign in to add or view holdings and SIPs."}
+                : "Rupee amounts are private to Meera, so they are not shown here. Everything else on this page is live."}
             </p>
           </div>
-          <Link href={admin ? "/portfolio#holdings" : "/manage"} className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-foreground px-3 py-2 text-sm font-medium text-background">
-            {admin ? "Add holdings" : "Sign in"} <ArrowRight className="size-4" aria-hidden />
-          </Link>
+          {admin && (
+            <Link href="/portfolio#holdings" className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-brand px-3 py-2 text-sm font-medium text-white dark:text-[var(--page)]">
+              Add holdings <ArrowRight className="size-4" aria-hidden />
+            </Link>
+          )}
         </div>
       )}
       <div className={hasHoldings ? "" : "col-span-2 lg:col-span-1"}>
@@ -81,11 +95,13 @@ const VERDICT = {
 export function AssessmentPanel({ label, reason, weekEnding, reportId, funds }: { label: string; reason: string; weekEnding: string; reportId: string; funds: FundPerformance[] }) {
   const v = VERDICT[label as keyof typeof VERDICT] ?? VERDICT["No action needed"];
   return (
-    <section className={cn("relative overflow-hidden rounded-2xl border p-6 pl-7", v.tint)}>
+    <section className={cn("relative overflow-hidden rounded-2xl border p-6 pl-7 shadow-card", v.tint)}>
       <span aria-hidden className={cn("absolute inset-y-0 left-0 w-1.5", v.bar)} />
       <div className="text-xs font-medium uppercase tracking-wide text-[var(--ink-secondary)]">This week&apos;s assessment · up to {formatHuman(weekEnding)}</div>
-      <h2 className="mt-2 flex items-center gap-2.5 text-2xl font-semibold tracking-tight sm:text-3xl">
-        <v.Icon className="size-7 shrink-0" aria-hidden />
+      <h2 className="font-display mt-2 flex items-center gap-3 text-2xl font-semibold tracking-tight sm:text-3xl">
+        <span className="grid size-11 shrink-0 place-items-center rounded-full bg-card shadow-card">
+          <v.Icon className="size-6" aria-hidden />
+        </span>
         {label}
       </h2>
       <p className="mt-2 max-w-3xl text-base leading-relaxed">{reason}</p>
@@ -153,7 +169,7 @@ function Gap({ pp, label }: { pp: number | null; label: string }) {
 export function FundSummary({ funds }: { funds: FundPerformance[] }) {
   return (
     <>
-      <div className="hidden overflow-hidden rounded-2xl border bg-card md:block">
+      <div className="hidden overflow-hidden rounded-2xl border bg-card shadow-card md:block">
         <table className="w-full text-sm">
           <thead className="border-b bg-muted/40 text-left text-xs text-muted-foreground">
             <tr>
@@ -173,10 +189,15 @@ export function FundSummary({ funds }: { funds: FundPerformance[] }) {
               return (
                 <tr key={f.schemeCode} className="group hover:bg-muted/30">
                   <td className="px-4 py-3">
-                    <Link href={`/funds/${f.schemeCode}`} className="font-medium group-hover:underline">
-                      {shortName(f.schemeName)}
-                    </Link>
-                    <div className="text-xs text-muted-foreground">{f.viewId ? VIEWS[f.viewId as ViewId].title : f.amfiCategory}</div>
+                    <div className="flex gap-2.5">
+                      <CatDot view={f.viewId} />
+                      <div>
+                        <Link href={`/funds/${f.schemeCode}`} className="font-medium group-hover:underline">
+                          {shortName(f.schemeName)}
+                        </Link>
+                        <div className="text-xs text-muted-foreground">{f.viewId ? VIEWS[f.viewId as ViewId].title : f.amfiCategory}</div>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-3 py-3 text-right">
                     <div className="tabular">{f.nav ? `₹${f.nav.value.toFixed(2)}` : "—"}</div>
@@ -216,11 +237,14 @@ export function FundSummary({ funds }: { funds: FundPerformance[] }) {
           const w = f.windows["1W"];
           return (
             <li key={f.schemeCode}>
-              <Link href={`/funds/${f.schemeCode}`} className="block rounded-xl border bg-card p-4">
+              <Link href={`/funds/${f.schemeCode}`} className="lift block rounded-2xl border bg-card p-4 shadow-card">
                 <div className="flex items-start justify-between gap-2">
-                  <div>
+                  <div className="flex gap-2.5">
+                    <CatDot view={f.viewId} />
+                    <div>
                     <div className="font-medium leading-snug">{shortName(f.schemeName)}</div>
                     <div className="text-xs text-muted-foreground">{f.viewId ? FUND_KIND[f.viewId as ViewId] : f.amfiCategory}</div>
+                    </div>
                   </div>
                   <span className={cn("inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium", s.cls)}>
                     <s.Icon className="size-3" aria-hidden />
@@ -269,8 +293,10 @@ export function Highlights({ items }: { items: Highlight[] }) {
         const Icon = HL_ICON[h.kind];
         return (
           <li key={h.title}>
-            <Link href={h.href} className="flex h-full flex-col rounded-xl border bg-card p-4 hover:border-foreground/30">
-              <Icon className="size-4 text-[var(--ink-secondary)]" aria-hidden />
+            <Link href={h.href} className="lift flex h-full flex-col rounded-2xl border bg-card p-5 shadow-card">
+              <span className="grid size-9 place-items-center rounded-xl bg-brand-soft text-brand">
+                <Icon className="size-4" aria-hidden />
+              </span>
               <div className="mt-2 font-medium leading-snug">{h.title}</div>
               <p className="mt-1 flex-1 text-sm leading-relaxed text-[var(--ink-secondary)]">{h.body}</p>
               <span className="mt-3 text-xs font-medium">See the details →</span>
@@ -293,8 +319,10 @@ export function QuickActions({ reportId }: { reportId: string | null }) {
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
       {actions.map((a) => (
-        <Link key={a.href + a.label} href={a.href} className="flex items-center gap-2 rounded-xl border bg-card px-3 py-3 text-sm font-medium hover:border-foreground/30">
-          <a.Icon className="size-4 shrink-0 text-[var(--ink-secondary)]" aria-hidden />
+        <Link key={a.href + a.label} href={a.href} className="lift flex items-center gap-3 rounded-2xl border bg-card px-3 py-3 text-sm font-medium shadow-card">
+          <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-brand-soft text-brand">
+            <a.Icon className="size-4" aria-hidden />
+          </span>
           {a.label}
         </Link>
       ))}

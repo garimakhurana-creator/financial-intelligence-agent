@@ -277,7 +277,8 @@ export async function writeNarrative(facts: AnalysisFacts): Promise<{ narrative:
   return { narrative: templateNarrative(facts), generator: "template", model: null, errors };
 }
 
-export async function runAnalysis(input: { schemeCode: number | null; document: DocumentFacts | null; sourceType: "search" | "code" | "pdf" }) {
+/** sourceType is "search" | "code" | "pdf"; a "v-" prefix marks a visitor's analysis (kept out of the owner's history). */
+export async function runAnalysis(input: { schemeCode: number | null; document: DocumentFacts | null; sourceType: string }) {
   const facts = await buildFacts(input);
   const n = await writeNarrative(facts);
   const name = facts.scheme?.schemeName ?? (typeof facts.document?.fields.fundName?.value === "string" ? facts.document.fields.fundName.value : "Uploaded document");

@@ -74,7 +74,7 @@ export function PerformanceChart({ series, initial, maxSelected = 4, height = 30
               type="button"
               onClick={() => setPeriod(p.id)}
               aria-pressed={period === p.id}
-              className={cn("rounded-md px-2.5 py-1 text-xs font-medium", period === p.id ? "bg-foreground text-background" : "text-[var(--ink-secondary)] hover:bg-muted")}
+              className={cn("rounded-md px-2.5 py-1 text-xs font-medium", period === p.id ? "bg-brand text-white dark:text-[var(--page)]" : "text-[var(--ink-secondary)] hover:bg-muted")}
             >
               {p.label}
             </button>

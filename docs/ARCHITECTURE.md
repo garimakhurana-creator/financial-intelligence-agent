@@ -69,8 +69,10 @@ columns small. Removing a fund only sets `active = false`, so history and past r
 ## Security
 
 - All secrets are server-only env vars (no `NEXT_PUBLIC_`); logs mask secret-looking keys and strip query strings.
-- Public: read-only pages and `/api/health` (booleans only). Owner-only: every mutation and every send, via an
-  HMAC-signed, httpOnly, SameSite=strict session cookie obtained with `ADMIN_PASSWORD` (login rate-limited).
+- Access: single-user, so `ACCESS_MODE=open` (default) needs no sign-in. Every mutation goes through `adminRoute`,
+  which rate-limits per IP (stricter limits for sends, job runs and report generation). `ACCESS_MODE=password`
+  restores the owner gate: an HMAC-signed, httpOnly, SameSite=strict session cookie obtained with `ADMIN_PASSWORD`
+  (login rate-limited).
 - Cron routes require `CRON_SECRET`; the WhatsApp webhook verifies Meta's `X-Hub-Signature-256` HMAC.
 - Inputs are validated (scheme codes, ids, enums); emails escape all dynamic text; external payloads are parsed
   with zod; news URLs are restricted to http(s) and social/UGC hosts are dropped.

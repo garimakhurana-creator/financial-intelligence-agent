@@ -11,4 +11,4 @@ export const POST = adminRoute(async (req: Request) => {
   if (job === "daily") return json(await runDaily("manual", { force }));
   if (job === "weekly") return json(await runWeekly("manual", { force, deliver }));
   throw new FundInputError("job must be daily or weekly");
-});
+}, { name: "jobs", max: 6, windowMs: 60 * 60_000 });
