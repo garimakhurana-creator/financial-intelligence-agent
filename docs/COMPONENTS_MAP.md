@@ -74,3 +74,24 @@ How the pieces fit together, mapped to the files that implement them. Arrows sho
 | Small-cap funds | Nifty Smallcap 100 & 250 vs Nifty 50 | Small Cap category | Relative performance, breadth, distance from 52-week high |
 | Short-duration debt | none (no equity index by design) | Short Duration category (2 AMFI labels) | Rates explainer; RBI/yield/inflation news |
 | International FoF | Nasdaq-100 (USD, INR), S&P 500, USD/INR | FoF Overseas (2 AMFI labels) | Currency decomposition of the INR return |
+
+## Redesign components (2026-10-11)
+
+| # | Component | Responsibility | Key files |
+|---|---|---|---|
+| 13 | App shell | Left sidebar (desktop) / drawer (mobile), six primary sections + settings | `src/components/app-nav.tsx`, `src/app/layout.tsx`, `src/components/page-header.tsx` |
+| 14 | Dashboard | Greeting, holdings totals, assessment + rules, fund summary, growth chart, highlights, quick actions | `src/app/page.tsx`, `src/components/dashboard.tsx`, `src/components/performance-chart.tsx`, `src/lib/highlights.ts` |
+| 15 | Portfolio | Comparison table, allocation, holdings/SIP editor, fund search/add/remove | `src/app/portfolio/page.tsx`, `src/components/portfolio-client.tsx`, `src/lib/portfolio.ts`, `src/app/api/holdings/*` |
+| 16 | Market & News | Index overview, trend chart, validated brief, topic news centre | `src/app/market/page.tsx`, `src/components/news-center.tsx`, `src/lib/news/*`, `src/lib/pipeline/news.ts` |
+| 17 | Explore Funds | Metrics, ranking, shortlist, browser, compare, preferences, watchlist | `src/lib/calc/metrics.ts`, `src/lib/calc/rank.ts`, `src/lib/pipeline/discovery.ts`, `src/lib/explore.ts`, `src/app/explore/*`, `src/components/explore-client.tsx` |
+| 18 | Analyse a Fund | Search/code/PDF entry, verified factsheet extraction, deterministic outcome, Gemini narrative, history | `src/lib/analysis/*`, `src/app/api/analyse/route.ts`, `src/app/analyse/*`, `src/components/analyse-form.tsx` |
+| 19 | Research persistence | Tables for metrics, watchlist, holdings, preferences, analyses, briefs | `src/lib/db/research.ts`, `src/lib/db/schema.ts` (v2) |
+
+```
+Daily cron -> NAVs -> indices -> NSE snapshot -> email sync -> DISCOVERY (AMFI + MFapi 5y)
+                                                                -> fund_metrics / discovery_groups -> Explore, Compare, Analyse alternatives
+           -> TOPIC NEWS (Tavily + GNews) -> Gemini fact/why (validated) -> market_news -> Market & News, highlights, fund pages
+                                          -> Gemini market brief (validated) -> market_briefs -> Market & News
+Owner -> /api/analyse (code | PDF <= 4 MB) -> unpdf text + Gemini extraction -> quote verification
+      -> MFapi full history + category peers -> deterministic strengths/concerns/outcome -> Gemini narrative (validated) -> fund_analyses
+```

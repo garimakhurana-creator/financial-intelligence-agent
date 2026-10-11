@@ -115,3 +115,32 @@ Telegram until the bot token is added; email can only go to the Resend account o
 **21. One limitation you'd fix next?**
 Use SIP cash-flow returns (XIRR) once Meera's instalment dates are known, and get a TRI data source so
 benchmark comparisons are exactly like-for-like.
+
+## Redesign questions
+
+**22. How do you rank funds in Explore without calling one "the best"?**
+Only within the same category, on 5 years of NAV history: 3- and 5-year returns versus the category median,
+consistency (how often it beat the median over rolling 1-year periods), worst fall and volatility, with 1-year return
+weighted at just 10%. Labels say "Worth researching" or "Strong historical consistency", never "best". A test proves a
+fund with one hot year cannot rank first.
+
+**23. Why don't you show expense ratios in Explore?**
+There is no verified free feed: AMFI's TER page is an interactive app, not a data API, so I show "not in our data"
+instead of guessing. All ranked funds are Direct plans, which removes most cost gaps, and a factsheet uploaded in
+Analyse a Fund gives the exact expense ratio, verified against the PDF.
+
+**24. How do you stop Gemini inventing numbers from an uploaded factsheet?**
+Gemini must return a short verbatim quote for every value. We extract the PDF's own text and accept a value only if the
+quote is in the document and contains that number. Unverified values are shown as reference only and never used.
+
+**25. How is the portfolio total calculated?**
+Only from what the owner enters: units x latest NAV for value, minus amount invested for gain. If units are missing we
+show nothing rather than estimate; returns alone cannot tell you how much money someone has.
+
+**26. What is the difference between tracked, held, watchlisted and analysed?**
+Tracked funds get the weekly check; holdings carry rupee amounts; the watchlist is research only; analyses are saved
+research reports. They are separate tables, so a watchlisted fund is never counted as an investment.
+
+**27. What does "What matters this week" use?**
+Fixed rules: a flagged fund, an index moving 2%+ in a week, the rupee moving 1%+, interest-rate news, or a fund 1.5+
+points behind similar funds over a month. At most three, each linked to its evidence.

@@ -10,53 +10,61 @@ npm run build       # production build
 npx tsx --env-file=.env.local scripts/smoke-sources.ts   # live check of every data source
 ```
 
-## Results (2026-10-11)
+## Results (2026-10-11, commit after the redesign)
 
 | Check | Result |
 |---|---|
-| `npm test` | **51 passed / 51** (5 files) |
+| `npm test` | **84 passed / 84** (10 files) |
 | `npm run typecheck` | 0 errors |
 | `npm run lint` | 0 errors, 0 warnings |
-| `npm run build` | succeeded (Next.js 16.4, all pages partially prerendered, API routes dynamic) |
+| `npm run build` | succeeded — 36 routes; pages partially prerendered, data streamed at request time |
 
-### Unit tests (mocked / pure — deterministic)
+### Unit tests (deterministic; external services mocked or not called)
 
-| File | Covers |
-|---|---|
-| `test/returns.test.ts` (18) | MFapi/AMFI date parsing; month-end clamping; calendar YTD reference; IST vs UTC "today"; return formula; zero/negative/NaN reference; holiday snapping (2 Oct → 1 Oct); insufficient history → unavailable (not 0%); data gap beyond 7 days; stale current NAV; invalid NAV rows dropped; benchmark anchored to the fund's dates; excess return null handling |
-| `test/peers.test.ts` (3) | Equal-weighted mean and median; peers with missing data excluded (not counted as 0%); no average below the minimum sample; limited-sample label |
-| `test/report.test.ts` (17) | Sentence counting with decimals/abbreviations; validator accepts a grounded report; rejects numbers not in the input, multi-sentence fields, buy/sell instructions, unknown evidence ids, missing category views, inconsistent "One fund worth watching", labels outside the three allowed; fallback always validates; retry-with-feedback then success; fallback after repeated failure; screening thresholds for equity, index and debt funds; label mapping; jargon kept out of everything Meera reads |
-| `test/plain.test.ts` (3) | Fixed gap-to-words mapping (about the same / slightly better / behind); missing data never gets a comparison word; signed formatting |
-| `test/delivery.test.ts` (10) | Email HTML escaping (model/user text), test labelling, plain-text link; Telegram splitting under 4,096 chars without dropping funds; recipient masking; WhatsApp template parameter cleaning; Yahoo null closes dropped; weekend prints dropped only for FX; wa.me number normalisation and number-less public link |
+| File | Tests | Covers |
+|---|---|---|
+| `returns.test.ts` | 18 | Date parsing; month-end clamping; calendar YTD; IST "today"; return formula; zero/negative/NaN references; holiday snapping; missing history → unavailable (never 0%); stale NAV; benchmark anchored to fund dates |
+| `peers.test.ts` | 3 | Equal-weighted mean/median; missing data excluded; minimum sample |
+| `metrics.test.ts` | 10 | CAGR (3Y/5Y), no annualising under a year, short history → null, volatility, max drawdown, weekly closes, rolling consistency vs category median, partial history |
+| `rank.test.ts` | 5 | Percentiles; a steady fund outranks a one-hot-year fund; < 3 years never ranked; small categories not ranked; 5-year factor re-weighting |
+| `explore.test.ts` | 3 | Preferences filter risky/long categories; shortlist ignores hot-year "Mixed record" funds and caps two per category; explains empty results |
+| `portfolio.test.ts` | 4 | Value only from units × NAV; gain only where both amounts exist; nothing invented without holdings; allocation from valued holdings; highlights ignore small moves and cap at three |
+| `report.test.ts` | 20 | Report validator (numbers grounded at written precision, one sentence per field, no advice, evidence ids, labels, jargon in headline/fund text); fallback validity; retry with feedback; screening thresholds; advice guard allows disclaimers; full-precision figures |
+| `delivery.test.ts` | 10 | Email escaping and TEST labelling; Telegram splitting; recipient masking; WhatsApp template params; Yahoo parsing (nulls, FX weekends); wa.me number handling and number-less public link |
+| `document.test.ts` | 8 | PDF header/type/size validation; real text extraction (unpdf) from a generated PDF; quote verification (wrong number, quote not in document, comma-grouped numbers); analysis outcome rules (strong, several concerns, insufficient history, Regular plan) |
+| `plain.test.ts` | 3 | Plain-language gap wording thresholds; no invented comparison when data missing |
 
-### Integration checks run against real services (not mocked)
+The PDF used in tests is a **synthetic fixture** generated in `test/fixtures/make-pdf.ts`; its values are invented
+and clearly labelled. Analyses created from it during testing were deleted from the database.
+
+### Integration checks against real services (not mocked)
 
 | Integration | How verified | Outcome |
 |---|---|---|
-| MFapi scheme lookup + history | smoke script; add-fund API | 5 seed funds + Parag Parikh Flexi Cap resolved; invalid code 9999999 rejected |
-| AMFI NAVAll parsing + peer universes | smoke script | 14,372 schemes; peers: Nifty 50 index 23, mid 33, small 36, short duration 23, FoF overseas 49 |
-| Index ingestion (Yahoo + NSE) | smoke script; **production** daily cron | 7/7 series OK on Vercel (`bom1`), including NSE Smallcap 100 |
-| Numerical validation vs source | UTI Nifty 50 Index Fund vs Nifty 50: 1M −3.91% vs −3.89%, 1W 0.43% vs 0.44% | Consistent with an index fund (TRI vs price gap ≈ 0.7 pp YTD) |
-| FX decomposition | `scripts/check-index-dates.ts` | (1+0.244%)(1+0.622%)−1 = 0.868% = INR series |
-| Appwrite persistence | setup script (idempotent re-run), full pipeline | 10 tables created; re-run made no changes |
-| News (Tavily + GNews) | report generation | 27 items, dated, de-duplicated; one GNews query 400 (rephrased) |
-| Gemini structured output | local and **production** report generation | `gemini-3.8-flash`, valid on attempt 1 (prod: 79 s incl. data refresh) |
-| Email (Resend) | local + production test sends; `scripts/email-status.ts` | Accepted, then Resend `last_event: delivered`; report page shows "Delivered (confirmed by provider)" |
-| Telegram | `scripts/send-test.ts telegram` and production test send (bot @Mutualfund_friend_bot) | Accepted by Telegram API (message ids recorded); bots receive no delivery receipts |
-| WhatsApp (Cloud API) | Meta test number +1 555-630-7891, permanent system-user token; `hello_world` template sent to the owner's number | Accepted by Meta (`message_status: accepted`, wamid recorded); custom `weekly_fund_report` template submitted for review |
-| Cron auth + idempotency | production `curl` without/with secret, twice | 401 without secret; second call `skipped: already completed` |
-| Admin API | local `curl` | unauth → 401; wrong password → 401; invalid/nonexistent/duplicate codes rejected; add → NAV backfilled; remove → soft; remove again → error; past reports intact |
+| MFapi / AMFI | smoke script; discovery run; add-fund and analysis APIs | 619 Direct-Growth schemes across 19 categories (505 ranked); invalid codes rejected |
+| Indices (Yahoo + NSE) | production daily job | 8/8 series incl. NSE Smallcap 100 from Vercel `bom1` |
+| Numbers vs source | UTI Nifty 50 Index Fund vs Nifty 50 (1M −3.91% vs −3.89%); FX decomposition 0.244% & 0.622% → 0.868% | consistent |
+| Appwrite | schema v1 → v2 migration (additive), all reads/writes | 17 tables; re-running setup makes no changes |
+| News (Tavily + GNews) | daily job in production | 55 topic items, 54 with validated explanations |
+| Gemini | weekly report, market brief, fund analysis, factsheet extraction — local and production | `gemini-3.8-flash`; validated outputs; template fallback exercised when validation failed |
+| Email (Resend) | test sends; status sync | accepted, then `delivered` per Resend events |
+| Telegram | production test send | accepted by Telegram (no read receipts for bots) |
+| WhatsApp Cloud API | `hello_world` template to the owner's number via the Meta test number | accepted (`message_status: accepted`); custom template `weekly_fund_report` **pending Meta review** |
+| Production daily job | owner-triggered forced run | succeeded in 109 s (limit 300 s): NAVs, indices, snapshot, email sync, Explore (19/19), news + brief |
+| Cron auth & idempotency | production calls | 401 without secret; duplicate run skipped |
+| Owner APIs in production | holdings PUT/DELETE, watchlist add/remove, preferences save/reset, unauthenticated write | all behaved as specified; test holding removed afterwards |
+| Upload route | PDF + linked fund via HTTP; random bytes named .pdf | analysis created (then deleted); non-PDF rejected by header check |
 
 ### UI checks
 
-Dashboard, fund detail, category (international), report and manage pages rendered with live data in the
-browser preview at a narrow (~720 px) width; tables scroll inside their cards; no console errors. Charts use a
-palette validated with the data-viz validator (all checks pass light/dark; one light-mode contrast warning
-mitigated by direct labels and adjacent tables).
+All six sections, compare, analysis report, fund detail, category and reports pages return 200 in production with
+live data. At 375 px width no page scrolls horizontally (checked on 8 pages) and the menu drawer opens with every
+section. Charts use the validated palette (8 categorical slots pass the adjacent-pair CVD and normal-vision checks;
+low-contrast slots are relieved by legends and the numeric labels under each chart).
 
 ## Not covered / limitations
 
-- No automated browser (E2E) tests; flows were checked manually and via API calls.
-- Repository functions are exercised against the real Appwrite project, not by unit tests with a mocked SDK.
-- WhatsApp Cloud API sends have not been verified (Meta credentials/template pending); a wa.me one-tap share link is available meanwhile.
-- The validator checks that each stated number exists in the input, not which metric it is attached to.
+- No automated end-to-end browser tests; flows were checked manually and through the HTTP APIs.
+- Repository functions are exercised against the real Appwrite project rather than a mocked SDK.
+- A real (non-synthetic) factsheet PDF has not yet been run through the upload path.
+- Validators check that each stated number exists in the verified input, not which metric it is attached to.

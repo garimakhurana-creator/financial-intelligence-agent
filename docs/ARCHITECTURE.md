@@ -83,3 +83,40 @@ columns small. Removing a fund only sets `active = false`, so history and past r
 - Multi-user would need: a `user_id` on funds/reports/deliveries, per-user recipients and consent, and peer stats
   remaining shared across users (they do not depend on the user).
 - Longer jobs could be split into per-step cron calls or a queue; today the full weekly run takes ~1–2 minutes.
+
+## Redesign additions (schema v2, 2026-10-11)
+
+### New pipelines
+
+| # | Pipeline | Trigger | Writes |
+|---|---|---|---|
+| 8 | Explore Funds discovery (`refreshDiscovery`): metrics + within-category ranking for 19 groups | daily cron, script | `fund_metrics`, `discovery_groups` |
+| 9 | Topic news + Gemini fact/why lines (`refreshMarketNews`) | daily cron, script | `market_news` (+ `topics`, `relevance`) |
+| 10 | Market brief (`writeMarketBrief`, validated) | daily cron | `market_briefs` |
+| 11 | Fund analysis (`runAnalysis`): NAV metrics, peers, optional PDF extraction, deterministic outcome, Gemini narrative | owner action | `fund_analyses` |
+
+The daily job now runs: NAVs → indices → NSE snapshot → email status sync → Explore Funds → news + brief
+(about 110 s in production, well inside the 300 s limit).
+
+### New tables (additive migration, `SCHEMA_VERSION = 2`)
+
+| Table | Row id | Purpose |
+|---|---|---|
+| `fund_metrics` | `fm_<code>` | Per-scheme metrics, ranking result, labels (no raw NAV series) |
+| `discovery_groups` | `g_<group>` | Category medians, reference-index returns, counts, errors |
+| `watchlist` | `w_<code>` | Research watchlist, never treated as holdings |
+| `holdings` | `h_<code>` | Units, amount invested, SIP amount/day entered by the owner |
+| `preferences` | `owner` | SIP questionnaire answers |
+| `fund_analyses` | random | Saved analyses: facts, verified document fields (no file), narrative, outcome |
+| `market_briefs` | `b_<yyyymmdd>` | Daily "What happened in the market?" with its input |
+| `market_news` (+cols) | sha1(url) | `topics` (7 topics) and `relevance` (Gemini fact/why JSON) |
+
+### Concepts kept separate
+
+Tracked funds (`tracked_funds`, monitored weekly) · held funds (`holdings`, the only source of rupee amounts) ·
+watchlisted funds (`watchlist`, research) · analysed funds (`fund_analyses`). A fund can be in any combination.
+
+### Privacy
+
+Holdings, preferences, watchlist and analyses are readable only with the owner session. Uploaded PDFs are processed
+in memory and never stored; only extracted fields, file name, size, page count and SHA-256 fingerprint are kept.

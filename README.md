@@ -1,81 +1,80 @@
-# Meera's Fund Tracker — Mutual Fund Performance Tracker
+# Meera's Fund Intelligence — Mutual Fund Performance Tracker
 
 MESA School of Business · AI and its Applications · Section 1 Final Evaluation · Problem Statement 19.
 
 **Live:** https://financial-intelligence-agent-lake.vercel.app
 **Code:** https://github.com/garimakhurana-creator/financial-intelligence-agent
 
-A personal mutual-fund intelligence system for Meera, a 28-year-old professional with five SIPs who wants to
-understand her money in plain language. Every day it stores the latest NAVs and index closes; every Saturday
-morning it compares each fund with its stated benchmark and with the average of similar funds, gathers the
-week's market and macro news, and has **Gemini Flash** write a plain-language report — three sentences per fund
-and one overall verdict (*No action needed* / *One fund worth watching* / *Consider reviewing your allocation*)
-— which is stored, shown in the app, emailed, and sent by Telegram (WhatsApp is wired and awaiting Meta setup).
+A personal mutual-fund intelligence platform for Meera, a 28-year-old professional with five SIPs who wants to
+understand her money in plain language. It tracks her funds every day, compares each with its stated benchmark and
+with similar funds, explains the market, helps her research new funds, analyses a fund before she invests, and every
+Saturday morning sends a Gemini-written report by email and Telegram (WhatsApp Cloud API wired; template awaiting
+Meta approval).
 
-| Question Meera asks | Where it is answered |
-|---|---|
-| How are my funds doing? | Dashboard table: NAV, 1W / 1M / YTD returns with the exact dates used |
-| Compared with what they should do? | vs stated benchmark (pp) and vs category peer average (pp, with n) |
-| Is it the market or the fund? | Market tiles (Nifty 50 / Midcap 150 / Smallcap 100), five category views, cited news |
-| Do I need to act? | Rule-based screen + Gemini-written verdict and reason, every Saturday |
+## Six sections
+
+| Section | What it answers | Highlights |
+|---|---|---|
+| **My Dashboard** `/` | How am I doing this week? | Greeting, holdings-based totals (only from entered data), weekly assessment + "Why am I seeing this?", all funds at a glance, interactive growth chart, "What matters this week", quick actions |
+| **My Portfolio** `/portfolio` | How do my funds compare? | Sortable/filterable comparison table, allocation from real holdings, holdings & SIP editor, add/remove funds by name or scheme code |
+| **Market & News** `/market` | What happened in the market? | Index overview (day/week/month, breadth, P/E), trend chart, validated daily brief, 7-topic news centre with filters and "why it may matter" |
+| **Explore Funds** `/explore` | Which funds are worth researching for a SIP? | 619 Direct-Growth schemes in 19 categories, transparent within-category ranking, shortlist, filters, compare up to 4, SIP preferences, research watchlist |
+| **Analyse a Fund** `/analyse` | Should I look closer before investing? | Search / scheme code / PDF factsheet; 10-section evidence report; factsheet fields verified against the PDF text; saved history |
+| **Weekly Reports** `/reports` | What did each Saturday say? | Archive by month, 3 sentences per fund, 5 category views, sources, delivery status, print view |
+
+Plus fund pages (`/funds/<code>`), five category views (`/categories/<view>`), methodology (`/methodology`) and
+Settings & funds (`/manage`).
 
 ## What is real and what is not
 
-- **Real data, end to end:** NAVs (AMFI via MFapi.in), category membership (AMFI NAVAll.txt), indices (Yahoo
-  Finance, NSE), news (Tavily, GNews), narrative (Gemini Flash, `gemini-flash-latest` → currently
-  `gemini-3.8-flash`). No mock data is shown anywhere in the app.
-- **Benchmarks are price indices**, while funds' stated benchmarks are total-return indices (TRI); this is
-  disclosed on every comparison. The debt fund's CRISIL benchmark has no free feed, so it is compared with peers only.
-- **Peer averages** are the equal-weighted mean of available Direct-Growth schemes in the same AMFI category —
-  not an official industry figure.
+- **Live data:** NAVs and categories (AMFI via MFapi.in and NAVAll.txt), indices (Yahoo Finance, NSE), news (Tavily,
+  GNews), AI text (Gemini Flash `gemini-flash-latest` → `gemini-3.8-flash`). No mock data is shown.
+- **Rupee amounts** appear only from holdings the owner enters; nothing is estimated from returns.
+- **Not available from a verified free feed** (shown as such, never guessed): expense ratios, official riskometers,
+  minimum SIP amounts, TRI benchmark history, CRISIL debt indices. Factsheet uploads can supply some of these.
+- **AI never decides numbers or labels**: all figures, rankings, assessments and outcomes are deterministic; Gemini
+  explains them and every output is validated (numbers must exist in the input, no advice language, evidence ids real).
 
 ## Stack
 
 Next.js 16 (App Router, TypeScript) · Tailwind CSS 4 + shadcn/ui · Recharts · Appwrite TablesDB · Gemini Flash
-(`@google/genai`) · Tavily + GNews · Resend · Telegram Bot API · WhatsApp Business Cloud API · Vercel (+ Cron).
+(`@google/genai`) · unpdf · Tavily + GNews · Resend · Telegram Bot API · WhatsApp Business Cloud API · Vercel + Cron.
 
-> The brief names Supabase for storage; this build uses **Appwrite TablesDB** by the owner's choice. The schema
-> and access layer are in `src/lib/db/`.
+> The brief names Supabase; this build uses **Appwrite TablesDB** by the owner's choice (`src/lib/db/`).
 
 ## Run locally
 
 ```bash
 npm install
-cp .env.example .env.local        # fill in the values (see docs/DELIVERY_AND_SCHEDULING.md)
-npx tsx --env-file=.env.local scripts/setup-db.ts      # create Appwrite database/tables (idempotent)
-npx tsx --env-file=.env.local scripts/run-data.ts      # seed Meera's 5 funds + ingest NAVs, indices, peers
-npx tsx --env-file=.env.local scripts/generate-report.ts   # generate a report with Gemini
+cp .env.example .env.local                                   # fill in values
+npx tsx --env-file=.env.local scripts/setup-db.ts            # create/migrate Appwrite tables (idempotent)
+npx tsx --env-file=.env.local scripts/run-data.ts            # seed Meera's 5 funds, ingest NAVs/indices/peers
+npx tsx --env-file=.env.local scripts/refresh-discovery.ts   # Explore Funds metrics + ranking (~20 s)
+npx tsx --env-file=.env.local scripts/refresh-news.ts        # topic news + market brief (~90 s)
+npx tsx --env-file=.env.local scripts/generate-report.ts     # weekly report with Gemini
 npm run dev
 ```
 
-Other scripts: `scripts/smoke-sources.ts` (live check of every data source), `scripts/send-test.ts <email|telegram|whatsapp>`
-(labelled test send of the latest report), `scripts/telegram-chat-id.ts`, `scripts/email-status.ts`.
+Checks: `npm test` (84 tests), `npm run typecheck`, `npm run lint`, `npm run build`.
 
-Checks: `npm test` (Vitest), `npm run typecheck`, `npm run lint`, `npm run build`.
+## Deploy and schedule
 
-## Deploy
+Pushing to `main` deploys to Vercel (functions in `bom1`, Mumbai). Crons (`vercel.json`):
 
-The GitHub repo is connected to the Vercel project; pushing to `main` deploys to production. Environment
-variables are set in Vercel → Project → Settings → Environment Variables (same names as `.env.example`).
-`vercel.json` pins functions to Mumbai (`bom1`) and defines two crons:
-
-| Cron (UTC) | IST window | Job |
+| Cron (UTC) | IST | Job |
 |---|---|---|
-| `30 18 * * *` | daily 00:00–00:59 | `/api/cron/daily` — NAVs, indices, NSE breadth, email status sync |
-| `30 2 * * 6` | Saturday 08:00–08:59 | `/api/cron/weekly` — refresh, peers, news, Gemini report, email + Telegram + WhatsApp |
+| `30 18 * * *` | daily 00:00–00:59 | NAVs, indices, NSE breadth, email status sync, Explore Funds refresh, topic news + market brief (~110 s) |
+| `30 2 * * 6` | Saturday 08:00–08:59 | refresh, peer averages, news, Gemini report, email + Telegram + WhatsApp |
 
-## Using it
+## Access
 
-- **Dashboard** (`/`), **fund detail** (`/funds/<code>`), **five category views** (`/categories/<view>`),
-  **report archive** (`/reports`), **methodology** (`/methodology`) are public.
-- **Manage** (`/manage`) needs the owner password (`ADMIN_PASSWORD`): add a fund by scheme code (looked up and
-  confirmed before saving), remove a fund (history and past reports kept), generate a report now, run jobs.
-- Test sends are on each report page (owner only) and are labelled TEST in the message and the log.
+Reading the dashboard, market, explore, reports and methodology is public. Holdings, SIP preferences, the watchlist,
+fund analyses, fund management, report generation and sends require the owner password (`ADMIN_PASSWORD`).
 
 ## Documentation
 
 `docs/ARCHITECTURE.md` · `docs/COMPONENTS_MAP.md` · `docs/DATA_SOURCES.md` · `docs/CALCULATION_METHODOLOGY.md` ·
-`docs/AI_REPORT_DESIGN.md` · `docs/DELIVERY_AND_SCHEDULING.md` · `docs/COMPETITOR_RESEARCH.md` · `docs/TESTING.md` ·
-`docs/VIVA_PREPARATION.md`
+`docs/RANKING_METHODOLOGY.md` · `docs/AI_REPORT_DESIGN.md` · `docs/DELIVERY_AND_SCHEDULING.md` ·
+`docs/COMPETITOR_RESEARCH.md` · `docs/TESTING.md` · `docs/VIVA_PREPARATION.md`
 
-Past performance does not guarantee future returns. This is a monitoring tool, not investment advice.
+Past performance does not guarantee future returns. Research and monitoring only — not investment advice.

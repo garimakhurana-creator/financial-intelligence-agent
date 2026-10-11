@@ -70,3 +70,15 @@ We store publication date (not event date) and label it as such.
 
 Gemini API (`@google/genai`), model `gemini-flash-latest` (resolved to `gemini-3.8-flash` on 2026-10-11; the
 concrete model version returned is stored on each report). A fallback API key is supported.
+
+## Explore Funds and Analyse a Fund (added 2026-10-11)
+
+| Data | Source | Notes |
+|---|---|---|
+| Fund universe, categories, plan/option, fund house | AMFI NAVAll.txt | 19 groups, Direct-Growth only, both AMFI taxonomies merged; AMC name lines now parsed |
+| 5-year NAV history per scheme | MFapi.in ranged requests | about 620 schemes refreshed daily in about 20 s (8 concurrent requests) |
+| Category reference indices (3Y/5Y) | Yahoo Finance 10-year daily (`^NSEI`, `NIFTYMIDCAP150.NS`, `NIFTYSMLCAP250.NS`, `^CRSLDX` Nifty 500) | price indices, labelled "reference", not each fund's stated benchmark |
+| Expense ratio, riskometer, minimum SIP, holdings, sectors | Uploaded factsheet only | No verified free bulk feed: AMFI's TER page (amfiindia.com/ter-of-mf-schemes) is an interactive web app without a documented data endpoint, so it is not scraped |
+| Factsheet text | unpdf (PDF.js) | used to verify every extracted quote |
+
+Topic news (7 topics x 2 queries, daily) uses about 14 Tavily credits a day plus the weekly report's queries.
