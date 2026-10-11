@@ -163,7 +163,7 @@ export const VIEWS: Record<ViewId, ViewDef> = {
     title: "Short-duration debt funds",
     short: "Short-duration debt",
     marketIndices: [],
-    newsQueries: ["RBI monetary policy repo rate decision", "India 10-year government bond yield week", "India CPI inflation latest"],
+    newsQueries: ["RBI monetary policy repo rate decision", "India government bond yield this week", "India CPI inflation latest"],
     focus:
       "RBI policy (repo rate, stance, liquidity), government bond and corporate bond yields, inflation prints, and credit/interest-rate risk. Never use equity indices as the benchmark.",
     assetClass: "debt",
