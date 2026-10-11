@@ -51,6 +51,7 @@ export function allowedNumbers(input: unknown): Set<string> {
     allowed.add(a.toFixed(2));
     allowed.add(a.toFixed(1));
     allowed.add(a.toFixed(0));
+    allowed.add(String(a)); // exact value, so figures quoted at full precision (e.g. a NAV) match
   };
   const walk = (v: unknown) => {
     if (typeof v === "number") add(v);
@@ -69,8 +70,16 @@ export function allowedNumbers(input: unknown): Set<string> {
 export function isAllowedNumber(t: { value: number; decimals: number }, allowed: Set<string>): boolean {
   // Small integers (counts, days, "1 month") and calendar years are always fine.
   if (t.decimals === 0 && (t.value <= 31 || (t.value >= 1990 && t.value <= 2100))) return true;
-  if (t.decimals > 2) return allowed.has(t.value.toFixed(2)) && Number(t.value.toFixed(2)) === t.value;
+  if (t.decimals > 2) return allowed.has(String(t.value)) || (allowed.has(t.value.toFixed(2)) && Number(t.value.toFixed(2)) === t.value);
   return allowed.has(t.value.toFixed(t.decimals));
+}
+
+/** Sentences that disclaim advice ("not a recommendation to buy or sell") are not instructions. */
+const DISCLAIMER_RE = /\b(not|never|no|isn't|is not)\b[^.!?]*\b(recommendation|advice|instruction|suggestion|telling you)\b|\b(rather than|instead of)\b[^.!?]*\b(buy|sell)/i;
+
+export function hasAdvice(text: string): boolean {
+  const kept = text.split(/(?<=[.!?])\s+/).filter((s) => !DISCLAIMER_RE.test(s));
+  return ADVICE_RE.test(kept.join(" "));
 }
 
 export interface ValidationResult {
@@ -98,7 +107,7 @@ export function validateReport(raw: unknown, input: ReportInput): ValidationResu
 
   const checkText = (where: string, text: string) => {
     for (const n of numberTokens(text)) if (!isAllowedNumber(n, allowed)) errors.push(`${where}: number ${n.value} is not in the verified input`);
-    if (ADVICE_RE.test(text)) errors.push(`${where}: contains a buy/sell-style instruction`);
+    if (hasAdvice(text)) errors.push(`${where}: contains a buy/sell-style instruction`);
   };
   const checkEvidence = (where: string, ids: string[]) => {
     for (const id of ids) if (!evidence.has(id)) errors.push(`${where}: unknown evidence id ${id}`);

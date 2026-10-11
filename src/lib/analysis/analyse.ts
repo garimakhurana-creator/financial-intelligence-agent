@@ -9,7 +9,7 @@ import { REPORT_TZ } from "@/lib/env";
 import { mapLimit } from "@/lib/http";
 import { errorMessage } from "@/lib/log";
 import type { DiscoveryFundData, DiscoveryGroupData } from "@/lib/pipeline/discovery";
-import { ADVICE_RE, allowedNumbers, isAllowedNumber, numberTokens } from "@/lib/report/validate";
+import { allowedNumbers, hasAdvice, isAllowedNumber, numberTokens } from "@/lib/report/validate";
 import { fetchNavAll, isDirectGrowth, selectPeerUniverse } from "@/lib/sources/amfi";
 import { fetchSchemeHistory, MFAPI_SOURCE, type SchemeMeta } from "@/lib/sources/mfapi";
 import type { DocumentFacts } from "@/lib/analysis/document";
@@ -237,7 +237,7 @@ export function validateNarrative(raw: unknown, facts: AnalysisFacts): { ok: boo
   const errors: string[] = [];
   for (const k of SECTIONS) {
     for (const n of numberTokens(p.data[k])) if (!isAllowedNumber(n, allowed)) errors.push(`${k}: number ${n.value} is not in FACTS`);
-    if (ADVICE_RE.test(p.data[k])) errors.push(`${k}: contains a buy/sell-style instruction`);
+    if (hasAdvice(p.data[k])) errors.push(`${k}: contains a buy/sell-style instruction`);
   }
   if (!p.data.assessment.toLowerCase().includes(facts.outcome.toLowerCase())) errors.push(`assessment: must state the outcome "${facts.outcome}" verbatim`);
   return errors.length ? { ok: false, errors } : { ok: true, errors: [], value: p.data };

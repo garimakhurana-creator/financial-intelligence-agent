@@ -4,7 +4,7 @@ import { VIEW_IDS, VIEWS, type ViewId } from "@/lib/catalog";
 import { round } from "@/lib/calc/returns";
 import { errorMessage } from "@/lib/log";
 import type { IndexPerformance } from "@/lib/pipeline/data";
-import { ADVICE_RE, allowedNumbers, isAllowedNumber, numberTokens } from "@/lib/report/validate";
+import { allowedNumbers, hasAdvice, isAllowedNumber, numberTokens } from "@/lib/report/validate";
 import type { IndexSnapshot } from "@/lib/sources/nse";
 import { TOPIC_BY_ID, type TopicNewsItem } from "@/lib/news/topics";
 
@@ -66,7 +66,7 @@ export async function explainNews(items: TopicNewsItem[]): Promise<{ map: Map<st
       // Numbers in fact/why must appear in that article's own title or summary.
       const allowed = allowedNumbers([src.title, src.summary]);
       const bad = [...numberTokens(out.fact), ...numberTokens(out.why)].some((t) => !isAllowedNumber(t, allowed));
-      if (bad || ADVICE_RE.test(out.fact) || ADVICE_RE.test(out.why)) {
+      if (bad || hasAdvice(out.fact) || hasAdvice(out.why)) {
         rejected++;
         continue;
       }
@@ -145,7 +145,7 @@ export function validateBrief(raw: unknown, input: BriefInput): { ok: boolean; e
   const texts = [p.data.headline, ...p.data.biggestMoves, ...p.data.macro, ...p.data.implications.map((i) => i.text), ...p.data.risks];
   for (const t of texts) {
     for (const n of numberTokens(t)) if (!isAllowedNumber(n, allowed)) errors.push(`number ${n.value} is not in the input`);
-    if (ADVICE_RE.test(t)) errors.push("contains buy/sell-style instruction");
+    if (hasAdvice(t)) errors.push("contains buy/sell-style instruction");
   }
   for (const id of p.data.evidenceIds) if (!ids.has(id)) errors.push(`unknown evidence id ${id}`);
   return errors.length ? { ok: false, errors } : { ok: true, errors: [], value: p.data };

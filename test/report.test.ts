@@ -200,3 +200,17 @@ describe("advice guard", () => {
     expect(ADVICE_RE.test("Domestic institutional buying offset foreign selling.")).toBe(false);
   });
 });
+
+describe("hasAdvice", () => {
+  it("ignores disclaimers but still catches instructions in the same text", async () => {
+    const { hasAdvice } = await import("@/lib/report/validate");
+    expect(hasAdvice("This is a research signal, not a recommendation to buy or sell.")).toBe(false);
+    expect(hasAdvice("This is not advice. You should sell the fund now.")).toBe(true);
+  });
+  it("accepts a figure quoted at the input's full precision", async () => {
+    const { allowedNumbers, isAllowedNumber } = await import("@/lib/report/validate");
+    const allowed = allowedNumbers({ nav: 88.9258 });
+    expect(isAllowedNumber({ value: 88.9258, decimals: 4 }, allowed)).toBe(true);
+    expect(isAllowedNumber({ value: 88.9259, decimals: 4 }, allowed)).toBe(false);
+  });
+});

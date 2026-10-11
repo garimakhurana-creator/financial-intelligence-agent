@@ -77,7 +77,8 @@ Rules:
 - topHoldings and sectors: up to 10 each, with portfolio weights.`;
 
 const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9.%]+/g, " ").replace(/\s+/g, " ").trim();
-const numsIn = (s: string) => (s.match(/\d+(?:\.\d+)?/g) ?? []).map(Number);
+/** Numbers in a quote; thousands separators (12,345 or Indian 1,23,456) are part of the number. */
+const numsIn = (s: string) => (s.match(/\d{1,3}(?:,\d{2,3})+(?:\.\d+)?|\d+(?:\.\d+)?/g) ?? []).map((x) => Number(x.replace(/,/g, "")));
 
 export type Verified<T> = { value: T; quote: string | null; verified: boolean };
 
