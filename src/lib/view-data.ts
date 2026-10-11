@@ -103,3 +103,17 @@ export async function loadPortfolio() {
   const portfolio = admin ? summarisePortfolio(holdings, withPeer) : null;
   return { asOf, admin, funds, performance, holdings, portfolio };
 }
+
+export async function loadMarket() {
+  await connection();
+  const asOf = todayIn(REPORT_TZ());
+  const [indices, snapshot, brief, news, funds] = await Promise.all([
+    buildIndexSet(["NIFTY50", "NIFTY_MIDCAP150", "NIFTY_SMALLCAP100", "NIFTY_SMALLCAP250", "NASDAQ100", "USDINR"], asOf),
+    repo.getLatestMarketSnapshot<IndexSnapshot[]>(),
+    research.getLatestMarketBrief<{ brief: import("@/lib/news/brief").MarketBrief; input: import("@/lib/news/brief").BriefInput }>().catch(() => null),
+    repo.listNewsSince(addDays(asOf, -30) + "T00:00:00.000Z", 600).catch(() => []),
+    repo.listFunds({ activeOnly: true }),
+  ]);
+  const trackedViews = [...new Set(funds.map((f) => f.viewId).filter(Boolean) as string[])];
+  return { asOf, indices, snapshot, brief, news, trackedViews };
+}
