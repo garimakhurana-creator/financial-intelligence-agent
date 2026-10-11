@@ -1,6 +1,7 @@
 import { Resend } from "resend";
 import { formatHuman } from "@/lib/dates";
 import { MissingConfigError, requireEnv } from "@/lib/env";
+import { log } from "@/lib/log";
 import type { StoredWeeklyReport } from "@/lib/report/build";
 import { maskEmail, maskPhone, renderEmail } from "@/lib/delivery/render";
 import { whatsappShareLink, whatsappShareText } from "@/lib/delivery/share";
@@ -8,6 +9,8 @@ import { whatsappShareLink, whatsappShareText } from "@/lib/delivery/share";
 export interface SendResult {
   providerMessageId: string;
   recipientMasked: string;
+  /** Optional note for the run log, e.g. which WhatsApp template was used. */
+  detail?: string;
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -58,60 +61,87 @@ export function templateText(s: string, max = 900): string {
   return clean.length > max ? `${clean.slice(0, max - 1)}…` : clean;
 }
 
-/**
- * Sends the approved template. Template body (configured in WhatsApp Manager):
- *   Hi {{1}}, your weekly mutual fund report for the week ending {{2}} is ready.
- *   Overall: {{3}}. Read the full report here: {{4}} (monitoring summary, not investment advice).
- * Meta does not allow a template body to end with a variable, hence the closing phrase.
- * Business-initiated messages outside a 24-hour customer-service window must use an approved
- * template — free-form text would be rejected by Meta.
- */
-export async function sendWhatsApp(report: StoredWeeklyReport, reportUrl: string, opts: { isTest: boolean }): Promise<SendResult> {
-  const env = requireEnv([...WA_KEYS], "WhatsApp");
-  if (!whatsappOptedIn()) throw new MissingConfigError("WhatsApp", ["WHATSAPP_RECIPIENT_OPTED_IN=yes (recipient consent)"]);
-  const out = report.report.output;
-  const params = [
-    report.inputSnapshot.investorName,
-    formatHuman(report.weekEnding),
-    `${opts.isTest ? "[TEST] " : ""}${out.assessment.label} — ${out.assessment.reason}`,
-    reportUrl,
-  ];
-  const body = {
-    messaging_product: "whatsapp",
-    to: env.WHATSAPP_RECIPIENT_NUMBER.replace(/^\+/, ""),
-    type: "template",
-    template: {
-      name: env.WHATSAPP_TEMPLATE_NAME,
-      language: { code: process.env.WHATSAPP_TEMPLATE_LANGUAGE?.trim() || "en" },
-      components: [{ type: "body", parameters: params.map((t) => ({ type: "text", text: templateText(t) })) }],
-    },
-  };
-  // No automatic retries here: a timeout after Meta accepted the request would otherwise
-  // produce a duplicate message. Retries are explicit, from the delivery log.
-  const ctrl = new AbortController();
-  const timer = setTimeout(() => ctrl.abort(), 20_000);
-  let res: Response;
-  try {
-    res = await fetch(`https://graph.facebook.com/${env.WHATSAPP_GRAPH_VERSION}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}`, "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-      signal: ctrl.signal,
-    });
-  } finally {
-    clearTimeout(timer);
+/** Link to the report's PDF (public route), used as the WhatsApp document header. */
+export function reportPdfUrl(reportUrl: string): string {
+  return `${reportUrl.replace(/\/reports\//, "/api/reports/")}/pdf`;
+}
+
+/** Meta errors meaning "this template can't be used (yet)": missing, not approved, or parameter mismatch. */
+const TEMPLATE_UNUSABLE = new Set([132000, 132001, 132005, 132007, 132012, 132015, 132016]);
+
+class WhatsAppApiError extends Error {
+  constructor(
+    message: string,
+    readonly code: number | undefined,
+  ) {
+    super(message);
   }
+}
+
+async function postTemplate(env: Record<string, string>, to: string, template: Record<string, unknown>): Promise<string> {
+  // No automatic retries: a timeout after Meta accepted the request would otherwise produce a
+  // duplicate message. Retries are explicit, from the delivery log.
+  const res = await fetch(`https://graph.facebook.com/${env.WHATSAPP_GRAPH_VERSION}/${env.WHATSAPP_PHONE_NUMBER_ID}/messages`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${env.WHATSAPP_ACCESS_TOKEN}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ messaging_product: "whatsapp", to, type: "template", template }),
+    signal: AbortSignal.timeout(20_000),
+  });
   const json = (await res.json().catch(() => ({}))) as {
     messages?: { id: string }[];
     error?: { message?: string; code?: number; error_data?: { details?: string } };
   };
   if (!res.ok) {
     const e = json.error;
-    throw new Error(`WhatsApp API ${res.status}${e?.code ? ` (code ${e.code})` : ""}: ${e?.error_data?.details ?? e?.message ?? "request rejected"}`);
+    throw new WhatsAppApiError(`WhatsApp API ${res.status}${e?.code ? ` (code ${e.code})` : ""}: ${e?.error_data?.details ?? e?.message ?? "request rejected"}`, e?.code);
   }
   const id = json.messages?.[0]?.id;
   if (!id) throw new Error("WhatsApp API accepted the request but returned no message id");
-  return { providerMessageId: id, recipientMasked: maskPhone(env.WHATSAPP_RECIPIENT_NUMBER) };
+  return id;
+}
+
+/**
+ * Sends the weekly report on WhatsApp through an approved template (business-initiated messages
+ * must use one). Preferred: WHATSAPP_PDF_TEMPLATE_NAME — the full report attached as a PDF
+ * document (three sentences per fund, market, closing assessment), with this body:
+ *   Hi {{1}}, your weekly mutual fund report for the week ending {{2}} is attached as a PDF.
+ *   Overall: {{3}}. Full report with sources: {{4}} (monitoring summary, not investment advice).
+ * If that template is missing or not approved yet, Meta rejects the request (nothing is sent)
+ * and we fall back to the text template WHATSAPP_TEMPLATE_NAME (same body, no attachment).
+ */
+export async function sendWhatsApp(report: StoredWeeklyReport, reportUrl: string, opts: { isTest: boolean }): Promise<SendResult> {
+  const env = requireEnv([...WA_KEYS], "WhatsApp");
+  if (!whatsappOptedIn()) throw new MissingConfigError("WhatsApp", ["WHATSAPP_RECIPIENT_OPTED_IN=yes (recipient consent)"]);
+  const out = report.report.output;
+  const to = env.WHATSAPP_RECIPIENT_NUMBER.replace(/^\+/, "");
+  const language = { code: process.env.WHATSAPP_TEMPLATE_LANGUAGE?.trim() || "en" };
+  const body = {
+    type: "body",
+    parameters: [
+      report.inputSnapshot.investorName,
+      formatHuman(report.weekEnding),
+      `${opts.isTest ? "[TEST] " : ""}${out.assessment.label} — ${out.assessment.reason}`,
+      reportUrl,
+    ].map((t) => ({ type: "text", text: templateText(t) })),
+  };
+  const recipientMasked = maskPhone(env.WHATSAPP_RECIPIENT_NUMBER);
+
+  const pdfTemplate = process.env.WHATSAPP_PDF_TEMPLATE_NAME?.trim();
+  if (pdfTemplate) {
+    const header = {
+      type: "header",
+      parameters: [{ type: "document", document: { link: reportPdfUrl(reportUrl), filename: `fund-report-${report.weekEnding}.pdf` } }],
+    };
+    try {
+      const id = await postTemplate(env, to, { name: pdfTemplate, language, components: [header, body] });
+      return { providerMessageId: id, recipientMasked, detail: "sent with the PDF report attached" };
+    } catch (e) {
+      if (!(e instanceof WhatsAppApiError && e.code !== undefined && TEMPLATE_UNUSABLE.has(e.code))) throw e;
+      log.warn("whatsapp.pdf_template_unusable", { template: pdfTemplate, error: e.message });
+    }
+  }
+  const id = await postTemplate(env, to, { name: env.WHATSAPP_TEMPLATE_NAME, language, components: [body] });
+  return { providerMessageId: id, recipientMasked, detail: pdfTemplate ? "PDF template not approved yet — sent the summary with the report link" : undefined };
 }
 
 // ---------------------------------------------------------------------------------------------

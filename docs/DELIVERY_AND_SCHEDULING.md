@@ -64,8 +64,17 @@ Test sends (report page → owner only, or `scripts/send-test.ts`) get a fresh `
 
 Implemented (`sendWhatsApp`, `/api/webhooks/whatsapp`) and reporting `awaiting_configuration` until set up.
 
-- Business-initiated messages outside a 24-hour customer-service window must use an **approved template**. Body:
-  `Hi {{1}}, your weekly mutual fund report for the week ending {{2}} is ready. Overall: {{3}}. Read the full report here: {{4}} (monitoring summary, not investment advice).`
+- Business-initiated messages outside a 24-hour customer-service window must use an **approved template**.
+- **Full report as a PDF** (preferred): template `weekly_fund_report_pdf` (`WHATSAPP_PDF_TEMPLATE_NAME`) has a
+  DOCUMENT header, filled with the report's public PDF link `/api/reports/<id>/pdf` — the same content and order as
+  the email: three sentences per fund, the market, then the closing overall assessment. Body:
+  `Hi {{1}}, your weekly mutual fund report for the week ending {{2}} is attached as a PDF. Overall: {{3}}. Full report with sources: {{4}} (monitoring summary, not investment advice).`
+  Submitted via the Graph API on 2026-10-11 (template id 1801939720898003; the sample PDF was uploaded with the
+  Resumable Upload API to obtain the header example handle).
+- **Fallback**: a template body is capped at about 1,024 characters, so the full text cannot go in the message itself.
+  Until the PDF template is approved, Meta rejects it (codes 132000–132016 — nothing is sent) and the sender
+  falls back to `weekly_fund_report` (`WHATSAPP_TEMPLATE_NAME`), the same body without the attachment, ending with
+  the report link. Any other error is not retried, so there is never a duplicate message.
   ({{3}} = label + reason). Parameters are cleaned of newlines/tabs as required by the API.
 - No automatic retries on WhatsApp sends (a timeout after Meta accepted would duplicate the message); retry is an
   explicit owner action.

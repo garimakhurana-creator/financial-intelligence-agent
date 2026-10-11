@@ -51,8 +51,8 @@ export async function deliver(report: StoredWeeklyReport, channel: Channel, opts
           : await sendWhatsApp(report, url, opts);
     // "sent_to_provider" — the API accepted it. Delivery is only confirmed later by a webhook.
     await repo.updateDelivery(logId, { status: "sent_to_provider", providerMessageId: r.providerMessageId, error: null, attempts });
-    log.info("delivery.sent", { channel, logId, isTest: opts.isTest });
-    return { channel, logId, status: "sent_to_provider" };
+    log.info("delivery.sent", { channel, logId, isTest: opts.isTest, detail: r.detail });
+    return { channel, logId, status: "sent_to_provider", detail: r.detail };
   } catch (e) {
     const status: repo.DeliveryStatus = e instanceof MissingConfigError ? "awaiting_configuration" : "failed";
     await repo.updateDelivery(logId, { status, error: errorMessage(e), attempts });
