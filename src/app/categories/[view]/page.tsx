@@ -6,7 +6,7 @@ import { IndexedLineChart } from "@/components/charts";
 import { DateText, Num, Pct, Pp } from "@/components/format";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { VIEW_IDS, VIEWS, type ViewId } from "@/lib/catalog";
+import { VIEW_IDS, type ViewId } from "@/lib/catalog";
 import { excessReturn, WINDOWS } from "@/lib/calc/returns";
 import type { IndexPerformance, StoredPeerStats } from "@/lib/pipeline/data";
 import type { IndexSnapshot } from "@/lib/sources/nse";
