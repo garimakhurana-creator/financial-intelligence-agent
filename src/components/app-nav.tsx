@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { BarChart3, BookOpen, Compass, FileSearch, LayoutDashboard, LineChart, Menu, Newspaper, Settings, Wallet, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -20,15 +20,15 @@ export const SECONDARY_NAV = [
   { href: "/methodology", label: "How it works", Icon: BarChart3 },
 ] as const;
 
-function isActive(pathname: string, href: string) {
+function isActive(pathname: string | null, href: string) {
+  if (pathname === null) return false;
   if (href === "/") return pathname === "/";
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-function NavLinks({ onNavigate }: { onNavigate?: () => void }) {
-  const pathname = usePathname();
+function NavLinks({ pathname, onNavigate }: { pathname: string | null; onNavigate?: () => void }) {
   const item = (n: { href: string; label: string; Icon: typeof LayoutDashboard }) => {
-    const active = isActive(pathname, n.href) || (n.href === "/portfolio" && pathname.startsWith("/funds/"));
+    const active = isActive(pathname, n.href) || (n.href === "/portfolio" && !!pathname?.startsWith("/funds/"));
     return (
       <Link
         key={n.href}
@@ -73,8 +73,21 @@ function Brand() {
   );
 }
 
-/** Desktop: fixed left sidebar. Mobile: top bar with a slide-in drawer. */
+/** Reads the URL (runtime data), so it streams in inside <Suspense>; the fallback is the same nav without an active item. */
+function ActiveNav() {
+  return <NavShell pathname={usePathname()} />;
+}
+
 export function AppNav() {
+  return (
+    <Suspense fallback={<NavShell pathname={null} />}>
+      <ActiveNav />
+    </Suspense>
+  );
+}
+
+/** Desktop: fixed left sidebar. Mobile: top bar with a slide-in drawer. */
+function NavShell({ pathname }: { pathname: string | null }) {
   const [open, setOpen] = useState(false);
   // Links close the drawer themselves (onNavigate); Escape closes it too.
   useEffect(() => {
@@ -88,7 +101,7 @@ export function AppNav() {
       <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r bg-[var(--surface-1)] px-4 py-5 lg:flex print:hidden">
         <Brand />
         <div className="mt-8 flex-1 overflow-y-auto">
-          <NavLinks />
+          <NavLinks pathname={pathname} />
         </div>
         <p className="text-[11px] leading-relaxed text-[var(--ink-muted)]">Research and monitoring only — not investment advice.</p>
       </aside>
@@ -110,7 +123,7 @@ export function AppNav() {
               </button>
             </div>
             <div className="mt-6 flex-1 overflow-y-auto">
-              <NavLinks onNavigate={() => setOpen(false)} />
+              <NavLinks pathname={pathname} onNavigate={() => setOpen(false)} />
             </div>
           </div>
         </div>

@@ -1,13 +1,19 @@
 import { MAX_CURRENT_STALENESS_DAYS, MAX_REFERENCE_GAP_DAYS } from "@/lib/calc/returns";
 import { MIN_PEERS_FOR_AVERAGE, MIN_PEERS_FOR_RELIABLE } from "@/lib/calc/peers";
-import { PEER_RULES, SEED_FUNDS } from "@/lib/catalog";
+import { DISCOVERY_GROUPS, PEER_RULES, SEED_FUNDS } from "@/lib/catalog";
 import { THRESHOLDS } from "@/lib/report/screening";
+import { FACTORS } from "@/lib/calc/rank";
+import { HIGHLIGHT_RULES } from "@/lib/highlights";
 import { GAP_CLEAR, GAP_SAME } from "@/lib/plain";
 
 export const metadata = { title: "Methodology · Meera's Fund Tracker" };
 
-function H({ children }: { children: React.ReactNode }) {
-  return <h2 className="mt-8 text-lg font-semibold">{children}</h2>;
+function H({ children, id }: { children: React.ReactNode; id?: string }) {
+  return (
+    <h2 id={id} className="mt-8 scroll-mt-20 text-lg font-semibold">
+      {children}
+    </h2>
+  );
 }
 
 export default function Methodology() {
@@ -114,6 +120,64 @@ export default function Methodology() {
         </li>
         <li>Each report stores its full input snapshot, so any past report can be audited and reproduced.</li>
       </ul>
+
+      <H id="highlights">&ldquo;What matters this week&rdquo;</H>
+      <p>At most three observations, chosen by fixed rules in this order; daily wiggles never qualify:</p>
+      <ul>
+        <li>a fund flagged by the weekly screen above;</li>
+        <li>a headline index moving {HIGHLIGHT_RULES.indexWeekMovePct}% or more in a week;</li>
+        <li>the rupee moving {HIGHLIGHT_RULES.fxWeekMovePct}% or more against the dollar in a week (affects overseas funds);</li>
+        <li>interest-rate news in the last week (affects debt funds);</li>
+        <li>a fund at least {Math.abs(HIGHLIGHT_RULES.fundLagVsPeers1M)} points behind similar funds over the month.</li>
+      </ul>
+
+      <H id="portfolio">Portfolio amounts</H>
+      <p>
+        Rupee figures come only from holdings you enter. Current value = units × latest NAV; gain/loss = current value − amount invested, shown only for funds with both. Nothing is
+        ever estimated from returns, and tracked or watchlisted funds are not counted as investments.
+      </p>
+
+      <H id="ranking">Explore Funds research ranking</H>
+      <p>
+        Every Direct-Growth scheme in {DISCOVERY_GROUPS.length} AMFI categories is measured from its NAV history and ranked <strong>only against funds in the same category</strong>. A
+        fund needs at least 3 years of history to be ranked; categories need at least 4 rankable funds.
+      </p>
+      <ul>
+        {(Object.keys(FACTORS) as (keyof typeof FACTORS)[]).map((k) => (
+          <li key={k}>
+            <strong>{FACTORS[k].label}</strong> ({Math.round(FACTORS[k].weight * 100)}%): {FACTORS[k].explain}
+          </li>
+        ))}
+      </ul>
+      <p>
+        Each factor is converted to a percentile within the category and combined with these weights (missing factors are re-weighted). Labels: score ≥ 70 with consistency ≥ 60% →
+        &ldquo;Strong historical consistency&rdquo;; score ≥ 60 → &ldquo;Worth researching&rdquo;; otherwise &ldquo;Mixed record&rdquo;; under 3 years → &ldquo;Insufficient
+        history&rdquo;. Recent 1-year return has a deliberately small weight, so a single hot year cannot top the list.
+      </p>
+      <p className="text-sm text-muted-foreground">
+        Limitations: expense ratios, official riskometers and minimum SIP amounts are not available from a free verified feed, so they are not ranking factors (all ranked funds are
+        Direct plans, which removes most cost differences). Overseas fund-of-funds track different markets, so their category comparison mixes unlike funds. Past performance does
+        not guarantee future returns; labels are research prompts, not recommendations.
+      </p>
+
+      <H id="analysis">Analyse a Fund outcomes</H>
+      <p>Strengths and concerns are found by fixed tests against the category (e.g. 3-year return at least 1 point above or below the median, consistency ≥ 60% or &lt; 40%, worst fall 2–3 points better or worse, Regular plan, IDCW option, under 3 years of history). Then:</p>
+      <ul>
+        <li>no NAV match or no 3-year record and peer group → &ldquo;Insufficient data for a reliable assessment&rdquo;;</li>
+        <li>two or more material concerns → &ldquo;Several concerns to investigate&rdquo;;</li>
+        <li>three or more strengths and no material concerns → &ldquo;Worth researching further&rdquo;;</li>
+        <li>otherwise → &ldquo;Suitable for further comparison&rdquo;.</li>
+      </ul>
+      <p>
+        Uploaded factsheets are read once and not stored. A factsheet value is &ldquo;verified&rdquo; only if the quote Gemini gives appears in the PDF&apos;s own text and contains the
+        value; unverified values are shown for reference but never used.
+      </p>
+
+      <H id="news">News and the market brief</H>
+      <p>
+        News is retrieved daily for seven topics and mapped to fund categories by a fixed table. Gemini adds a one-line factual summary and a labelled interpretation; any line that
+        states a number not in the article, or reads like advice, is dropped. The daily brief is held to the same checks.
+      </p>
 
       <H>Data sources</H>
       <ul>
