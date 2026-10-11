@@ -5,7 +5,8 @@ import { Monitor, Moon, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export type ThemePref = "light" | "dark" | "system";
-const KEY = "theme";
+// Bumped from "theme" so choices saved before dark became the default no longer override it.
+const KEY = "theme-v2";
 /** Dark unless the viewer picks Light or System in the sidebar. */
 export const DEFAULT_THEME: ThemePref = "dark";
 
