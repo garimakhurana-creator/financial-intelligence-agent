@@ -152,7 +152,7 @@ export function DeliveryLauncher({ reportId, channels, nextSend, nextShort, defa
 
   return (
     <>
-      {/* A slim tab on the right edge of the screen, half-way down. */}
+      {/* A slim tab on the right edge, low on the screen: clear of the header buttons, above the Ask button. */}
       <button
         type="button"
         onClick={() => setOpen(true)}
@@ -160,7 +160,7 @@ export function DeliveryLauncher({ reportId, channels, nextSend, nextShort, defa
         aria-expanded={open}
         aria-label={`Saturday delivery: ${ready} of ${channels.length} channels ready, next ${nextShort}`}
         title={`Next delivery ${nextShort}`}
-        className="fixed right-0 top-1/2 z-40 flex -translate-y-1/2 flex-col items-center gap-2 rounded-l-2xl border border-r-0 bg-card px-2 py-3 text-sm shadow-card transition-[padding] hover:bg-muted hover:pr-3 print:hidden"
+        className="fixed bottom-28 right-0 z-40 flex flex-col items-center gap-2 rounded-l-2xl border border-r-0 bg-card px-2 py-3 text-sm shadow-card transition-[padding] hover:bg-muted hover:pr-3 print:hidden"
       >
         <span aria-hidden>📬</span>
         <span className="font-semibold [writing-mode:vertical-rl] rotate-180">Delivery</span>
