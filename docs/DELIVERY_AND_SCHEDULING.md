@@ -54,7 +54,7 @@ Test sends (report page → owner only, or `scripts/send-test.ts`) get a fresh `
 
 ### Telegram — Bot API (interim messaging channel)
 
-- Plain-text message(s) split under Telegram's 4,096-character limit; link to the full report.
+- Two messages: (1) an HTML insights message — the verdict, key insights computed from the report's numbers (the flagged fund and both gaps, a market-wide dip, a fund behind only this year and why it is not flagged, best/slowest this week), up to three headlines the report cited as evidence, and a link to the detailed report; (2) the full report as a PDF (`sendDocument` with the public `/api/reports/<id>/pdf` link), which carries the three sentences per fund and the closing assessment. If the PDF cannot be attached, the insights message still stands.
 - Env: `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
 - Setup: in Telegram open **@BotFather** → `/newbot` → copy the token into `.env.local` and Vercel; open your new
   bot and send `/start`; run `npx tsx --env-file=.env.local scripts/telegram-chat-id.ts` to print your chat id.

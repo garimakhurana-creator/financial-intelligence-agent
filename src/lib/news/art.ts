@@ -33,8 +33,14 @@ export function ago(iso: string | null, now: number): string {
 
 const MEDIA = /\b(times|express|mint|standard|news|economic|hindu|reuters|bloomberg|moneycontrol|today|post|journal|herald|tribune|financial|business|cnbc|ndtv)\b|\.(com|in)\b/i;
 
-/** Drop a trailing " - Publisher" that some feeds append to headlines (the publisher is shown separately). */
-export function cleanTitle(title: string): string {
-  const m = title.match(/^(.{20,}?)\s+[-–|]\s+([^-–|]{2,40})$/);
-  return m && MEDIA.test(m[2]) ? m[1] : title;
+/**
+ * Drop a trailing " - Publisher" that some feeds append to headlines (the publisher is shown
+ * separately). Stripped when the suffix looks like a media name, or names the given publisher.
+ */
+export function cleanTitle(title: string, publisher?: string): string {
+  const m = title.match(/^(.{20,}?)\s+[-–—|]\s+([^-–—|]{2,40})$/);
+  if (!m) return title;
+  const first = m[2].trim().split(/\s+/)[0].toLowerCase();
+  const namesPublisher = Boolean(publisher && first.length >= 4 && publisher.toLowerCase().includes(first));
+  return MEDIA.test(m[2]) || namesPublisher ? m[1] : title;
 }

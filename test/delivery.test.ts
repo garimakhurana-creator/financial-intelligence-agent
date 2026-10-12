@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { renderTelegram, templateText } from "@/lib/delivery/channels";
+import { cleanTitle } from "@/lib/news/art";
 import { esc, maskEmail, maskPhone, renderEmail } from "@/lib/delivery/render";
 import { parseYahooChart } from "@/lib/sources/yahoo";
 import type { StoredWeeklyReport } from "@/lib/report/build";
@@ -15,7 +16,11 @@ function fakeReport(n = 5, sentence = "A plain sentence about the fund."): Store
     generator: "gemini",
     model: "m",
     createdAt: "2026-10-11T00:00:00Z",
-    inputSnapshot: { investorName: "Meera <script>" } as never,
+    inputSnapshot: {
+      investorName: "Meera <script>",
+      funds: funds.map((f, i) => ({ schemeCode: f.schemeCode, screening: { flag: i === 0, reason: "x" } })),
+      screening: { suggestedLabel: "No action needed", rationale: "", notes: { marketDip: [], yearLag: [] } },
+    } as never,
     report: {
       output: {
         funds,
@@ -23,7 +28,12 @@ function fakeReport(n = 5, sentence = "A plain sentence about the fund."): Store
         marketSummary: { text: "Markets were mixed.", evidenceIds: [] },
         assessment: { label: "No action needed", reason: "Nothing persistent <b>.", fundOfConcern: null },
       },
-      funds: funds.map((f) => ({ schemeCode: f.schemeCode, schemeName: `Fund ${f.schemeCode} - Direct Plan - Growth`, windows: {} })) as never,
+      funds: funds.map((f, i) => ({
+        schemeCode: f.schemeCode,
+        schemeName: `Fund ${f.schemeCode} - Direct Plan - Growth`,
+        viewId: "mid_cap",
+        windows: Object.fromEntries(["1W", "1M", "YTD"].map((w) => [w, { fund: { returnPct: i - 1 }, benchmark: null, peer: { mean: 0 }, vsBenchmarkPp: null, vsPeerPp: i - 1 }])),
+      })) as never,
       indices: [],
       breadth: null,
       news: [],
@@ -47,15 +57,32 @@ describe("email rendering", () => {
 });
 
 describe("telegram rendering", () => {
-  it("splits long reports under the 4096-character limit without losing funds", () => {
+  it("leads with insights and headlines, not the long per-fund sentences, and stays under the limit", () => {
     const long = "x".repeat(1200) + ".";
-    const msgs = renderTelegram(fakeReport(5, long), "https://x.test", { isTest: false });
-    expect(msgs.length).toBeGreaterThan(1);
-    for (const m of msgs) expect(m.length).toBeLessThanOrEqual(4096);
-    for (let i = 0; i < 5; i++) expect(msgs.join("\n")).toContain(`Fund ${100 + i}`);
+    const r = fakeReport(5, long);
+    (r.report.news as unknown[]).push({ evidenceId: "N1", title: "RBI raises repo rate to 5.50% - The Economic Times", url: "https://e.test/a", publisher: "economictimes.com" });
+    r.report.output.funds[0].evidenceIds = ["N1"];
+    const w0 = (r.report.funds[0] as unknown as { windows: Record<string, { vsPeerPp: number; fund: { returnPct: number } }> }).windows;
+    w0["1M"] = { ...w0["1M"], vsPeerPp: -2 };
+    w0.YTD = { ...w0.YTD, vsPeerPp: -4 };
+    const msg = renderTelegram(r, "https://x.test/reports/r1", { isTest: false });
+    expect(msg.length).toBeLessThanOrEqual(4096);
+    expect(msg).toMatch(/Key insights/);
+    expect(msg).toMatch(/👀 <b>Fund 100<\/b> is behind similar funds/); // flagged fund named in the insights
+    expect(msg).toMatch(/In the news/);
+    expect(msg).toContain('<a href="https://e.test/a">RBI raises repo rate to 5.50%</a>');
+    expect(msg).toContain('href="https://x.test/reports/r1"');
+    expect(msg).not.toContain("x".repeat(50)); // the long per-fund sentences live in the PDF
   });
-  it("labels test sends", () => {
-    expect(renderTelegram(fakeReport(1), "u", { isTest: true })[0]).toMatch(/TEST/);
+  it("escapes HTML and labels test sends", () => {
+    const msg = renderTelegram(fakeReport(1), "u", { isTest: true });
+    expect(msg).toMatch(/TEST/);
+    expect(msg).not.toMatch(/<script>/);
+  });
+  it("drops a publisher suffix from headlines", () => {
+    expect(cleanTitle("Nifty Smallcap 100 Slips as Lower Circuits Signal Weak Breadth | Kalkine India", "kalkine.co.in")).toBe("Nifty Smallcap 100 Slips as Lower Circuits Signal Weak Breadth");
+    expect(cleanTitle("Why is stock market up today? Good Friday for Sensex — TradingView News", "tradingview.com")).toBe("Why is stock market up today? Good Friday for Sensex");
+    expect(cleanTitle("Markets slide - What it means for you", "example.com")).toBe("Markets slide - What it means for you");
   });
 });
 

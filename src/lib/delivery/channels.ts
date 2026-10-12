@@ -2,9 +2,10 @@ import { Resend } from "resend";
 import { formatHuman } from "@/lib/dates";
 import { MissingConfigError, requireEnv } from "@/lib/env";
 import { log } from "@/lib/log";
+import { cleanTitle } from "@/lib/news/art";
+import { reportChecks } from "@/lib/report/checks";
 import type { StoredWeeklyReport } from "@/lib/report/build";
 import { maskEmail, maskPhone, renderEmail } from "@/lib/delivery/render";
-import { whatsappShareLink, whatsappShareText } from "@/lib/delivery/share";
 
 export interface SendResult {
   providerMessageId: string;
@@ -224,55 +225,121 @@ export async function sendWhatsApp(report: StoredWeeklyReport, reportUrl: string
 // ---------------------------------------------------------------------------------------------
 // Telegram (Bot API) — interim messaging channel while WhatsApp Business approval is pending.
 
-const TELEGRAM_LIMIT = 4096;
-
 export function telegramRecipientMasked(): string | null {
   const id = process.env.TELEGRAM_CHAT_ID?.trim();
   return id ? `chat ${maskPhone(id)}` : null;
 }
 
-/** Plain-text Telegram message(s); split on fund boundaries to stay under the 4096-char limit. */
-export function renderTelegram(report: StoredWeeklyReport, reportUrl: string, opts: { isTest: boolean }): string[] {
-  const out = report.report.output;
-  const head = [
-    opts.isTest ? "🧪 TEST — not the scheduled Saturday report\n" : "",
-    `📊 Weekly fund report — week ending ${formatHuman(report.weekEnding)}`,
-  ].join("\n");
-  const funds = out.funds.map((f) => {
-    const name = report.report.funds.find((x) => x.schemeCode === f.schemeCode)?.schemeName.replace(/\s*-\s*Direct Plan.*$/i, "") ?? String(f.schemeCode);
-    return `▪️ ${name}\n${f.performance}\n${f.comparison}\n${f.marketContext}`;
-  });
-  // Private chat, so the owner's own number is fine here (never shown on public pages).
-  const waNum = process.env.WHATSAPP_SHARE_NUMBER?.trim();
-  const wa = waNum ? `\n\nSave to WhatsApp (one tap, then Send): ${whatsappShareLink(whatsappShareText(report, reportUrl), waNum)}` : "";
-  const tail = `🌐 Market: ${out.marketSummary.text}\n\n✅ Overall assessment: ${out.assessment.label}\n${out.assessment.reason}\n\nFull report with sources: ${reportUrl}${wa}\n\nNot investment advice. Past performance does not guarantee future returns.`;
-  const messages: string[] = [];
-  let cur = head;
-  for (const block of [...funds, tail]) {
-    if ((cur + "\n\n" + block).length > TELEGRAM_LIMIT) {
-      messages.push(cur);
-      cur = block;
-    } else cur += "\n\n" + block;
+const escHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const shortFund = (n: string) => waName(n).replace(/\s+Index$/i, "");
+const range = (xs: number[]) => {
+  const a = xs.map((x) => Math.abs(x)).sort((p, q) => p - q);
+  return a[0] === a.at(-1) ? `${a[0].toFixed(2)}%` : `${a[0].toFixed(2)}%–${a.at(-1)!.toFixed(2)}%`;
+};
+const joinNames = (xs: string[]) => (xs.length <= 1 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
+
+/** Key insights, all computed from the report's numbers so they always agree with the verdict. */
+export function reportInsights(report: StoredWeeklyReport): string[] {
+  const out: string[] = [];
+  const checks = reportChecks(report);
+  for (const c of checks.filter((x) => x.flagged)) {
+    out.push(
+      c.month !== null && c.year !== null
+        ? `👀 <b>${escHtml(c.name)}</b> is behind similar funds this month (${Math.abs(c.month).toFixed(2)} pts) and this year (${Math.abs(c.year).toFixed(2)} pts) — worth watching.`
+        : `👀 <b>${escHtml(c.name)}</b> is worth watching.`,
+    );
   }
-  messages.push(cur);
-  return messages.map((m) => (m.length > TELEGRAM_LIMIT ? `${m.slice(0, TELEGRAM_LIMIT - 1)}…` : m));
+  if (!checks.some((x) => x.flagged)) out.push("✅ No fund has a problem of its own this week.");
+  const notes = report.inputSnapshot.screening.notes;
+  if (notes?.marketDip.length) {
+    out.push(`📉 ${escHtml(joinNames(notes.marketDip.map((d) => shortFund(d.name))))} fell ${range(notes.marketDip.map((d) => d.fund))} this month, but so did ${notes.marketDip.length === 1 ? "its market" : "their markets"} — a market-wide dip, not a fund problem.`);
+  }
+  for (const c of checks.filter((x) => !x.flagged && x.yearBehind && !x.monthBehind)) {
+    out.push(`🔎 ${escHtml(c.name)} trails similar funds this year (${Math.abs(c.year ?? 0).toFixed(2)} pts) but kept pace this month, so it isn't flagged.`);
+  }
+  const week = report.report.funds.filter((f) => f.windows["1W"].fund.returnPct !== null).sort((a, b) => (b.windows["1W"].fund.returnPct as number) - (a.windows["1W"].fund.returnPct as number));
+  if (week.length >= 2) {
+    out.push(`🏆 Best this week: ${escHtml(shortFund(week[0].schemeName))} <b>${signedPct(week[0].windows["1W"].fund.returnPct)}</b> · slowest: ${escHtml(shortFund(week.at(-1)!.schemeName))} <b>${signedPct(week.at(-1)!.windows["1W"].fund.returnPct)}</b>`);
+  }
+  return out;
 }
 
+/** Up to three headlines the report actually relied on (its evidence), linked to the articles. */
+export function reportNews(report: StoredWeeklyReport, max = 3): { title: string; url: string; publisher: string }[] {
+  const out = report.report.output;
+  const cited = [...out.funds.flatMap((f) => f.evidenceIds), ...out.marketSummary.evidenceIds, ...out.categories.flatMap((c) => c.evidenceIds)];
+  const seen = new Set<string>();
+  const picked: { title: string; url: string; publisher: string }[] = [];
+  for (const id of cited) {
+    const n = report.report.news.find((x) => x.evidenceId === id);
+    if (!n || seen.has(n.url)) continue;
+    seen.add(n.url);
+    picked.push({ title: cleanTitle(n.title, n.publisher), url: n.url, publisher: n.publisher });
+    if (picked.length >= max) break;
+  }
+  return picked;
+}
+
+/**
+ * The Telegram message (HTML, under Telegram's 4,096-character limit): the verdict, key insights,
+ * a few relevant headlines and a link to the detailed report. The full report follows as a PDF.
+ */
+export function renderTelegram(report: StoredWeeklyReport, reportUrl: string, opts: { isTest: boolean }): string {
+  const out = report.report.output;
+  const news = reportNews(report);
+  const lines = [
+    ...(opts.isTest ? ["🧪 <i>TEST — not the Saturday report</i>", ""] : []),
+    `📊 <b>Weekly fund report</b> · week ending ${formatHuman(report.weekEnding)}`,
+    `✅ <b>${escHtml(out.assessment.label)}</b>`,
+    "",
+    "💡 <b>Key insights</b>",
+    ...reportInsights(report).map((l) => `• ${l}`),
+    ...(news.length
+      ? ["", "📰 <b>In the news</b>", ...news.map((n) => `• <a href="${escHtml(n.url)}">${escHtml(n.title)}</a> <i>(${escHtml(n.publisher)})</i>`)]
+      : []),
+    "",
+    `🔗 <a href="${escHtml(reportUrl)}"><b>Read the detailed report</b></a> · 📎 PDF below`,
+    "<i>Monitoring summary, not investment advice.</i>",
+  ];
+  const text = lines.join("\n");
+  return text.length <= TELEGRAM_TEXT_LIMIT ? text : `${text.slice(0, TELEGRAM_TEXT_LIMIT - 1)}…`;
+}
+
+const TELEGRAM_TEXT_LIMIT = 4096;
+
+async function telegramCall(token: string, method: string, body: Record<string, unknown>): Promise<string> {
+  const res = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(30_000),
+  });
+  const j = (await res.json().catch(() => ({}))) as { ok?: boolean; result?: { message_id: number }; description?: string };
+  if (!res.ok || !j.ok || !j.result) throw new Error(`Telegram API ${res.status}: ${j.description ?? "request rejected"}`);
+  return String(j.result.message_id);
+}
+
+/** Sends the insights message, then the full report as a PDF. A failed PDF never undoes the message. */
 export async function sendTelegram(report: StoredWeeklyReport, reportUrl: string, opts: { isTest: boolean }): Promise<SendResult> {
   const env = requireEnv(["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"], "Telegram");
-  const ids: string[] = [];
-  for (const text of renderTelegram(report, reportUrl, opts)) {
-    const res = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text, disable_web_page_preview: true }),
-      signal: AbortSignal.timeout(20_000),
+  const recipientMasked = telegramRecipientMasked() ?? "chat";
+  const id = await telegramCall(env.TELEGRAM_BOT_TOKEN, "sendMessage", {
+    chat_id: env.TELEGRAM_CHAT_ID,
+    text: renderTelegram(report, reportUrl, opts),
+    parse_mode: "HTML",
+    disable_web_page_preview: true,
+  });
+  try {
+    await telegramCall(env.TELEGRAM_BOT_TOKEN, "sendDocument", {
+      chat_id: env.TELEGRAM_CHAT_ID,
+      document: reportPdfUrl(reportUrl),
+      caption: `📎 Full report${opts.isTest ? " (TEST)" : ""} · week ending ${formatHuman(report.weekEnding)}`,
     });
-    const j = (await res.json().catch(() => ({}))) as { ok?: boolean; result?: { message_id: number }; description?: string };
-    if (!res.ok || !j.ok || !j.result) throw new Error(`Telegram API ${res.status}: ${j.description ?? "request rejected"}`);
-    ids.push(String(j.result.message_id));
+    return { providerMessageId: id, recipientMasked, detail: "insights message and PDF report sent" };
+  } catch (e) {
+    log.warn("telegram.document_failed", { error: e instanceof Error ? e.message : String(e) });
+    return { providerMessageId: id, recipientMasked, detail: "insights message sent; the PDF could not be attached" };
   }
-  return { providerMessageId: ids.join(","), recipientMasked: telegramRecipientMasked() ?? "chat" };
 }
 
 // ---------------------------------------------------------------------------------------------
