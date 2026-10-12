@@ -5,7 +5,7 @@ import { Card, Explain, PageHeader } from "@/components/page-header";
 import { ExploreWorkspace, PreferencesForm } from "@/components/explore-client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { DISCOVERY_GROUPS } from "@/lib/catalog";
-import { shortlist } from "@/lib/explore";
+import { compactRows, shortlist } from "@/lib/explore";
 import { loadExplore } from "@/lib/view-data";
 
 export const metadata = { title: "Explore Funds · Meera's Money" };
@@ -49,7 +49,6 @@ async function Explore() {
   }
   const s = shortlist(d.rows, d.prefs);
   const groups = d.groups
-    .map((g) => ({ key: g.groupKey, label: g.data.label }))
     .sort(
       (a, b) =>
         DISCOVERY_GROUPS.findIndex((x) => x.key === a.key) -
@@ -137,7 +136,7 @@ async function Explore() {
       )}
 
       <ExploreWorkspace
-        rows={d.rows}
+        compact={compactRows(d.rows)}
         shortlist={s.rows}
         watched={d.watch.map((w) => w.schemeCode)}
         admin={d.admin}

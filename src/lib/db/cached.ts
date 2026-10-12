@@ -145,3 +145,29 @@ export async function latestMarketBrief<D>() {
 export async function warmPages(baseUrl: string) {
   await Promise.allSettled(["/", "/market", "/portfolio", "/explore"].map((path) => fetch(`${baseUrl}${path}`, { signal: AbortSignal.timeout(25_000) }).then((r) => r.arrayBuffer())));
 }
+
+/**
+ * Explore Funds, ready to render: the trimmed rows and group labels, cached as one entry. Raw
+ * metrics are ~1.5 KB per fund (617 funds), so pages should not read or ship them per visit.
+ */
+export async function exploreData() {
+  "use cache: remote";
+  cacheTag(DATA_TAG);
+  cacheLife("hours");
+  const [metrics, groups] = await Promise.all([
+    research.listFundMetrics<import("@/lib/pipeline/discovery").DiscoveryFundData>(),
+    research.listDiscoveryGroups<import("@/lib/pipeline/discovery").DiscoveryGroupData>(),
+  ]);
+  const { toUniverseRow, groupLabelMap } = await import("@/lib/explore");
+  const labels = groupLabelMap(groups);
+  const rows = metrics
+    .map((m) => toUniverseRow(m, labels[m.groupKey] ?? m.groupKey))
+    .filter((r): r is NonNullable<typeof r> => r !== null)
+    // The cards show one strength and one caution; the rest stays in the stored data.
+    .map((r) => ({ ...r, strengths: r.strengths.slice(0, 1), cautions: r.cautions.slice(0, 1) }));
+  return {
+    rows,
+    groups: groups.map((g) => ({ key: g.groupKey, label: g.data.label })),
+    computedAt: groups.map((g) => g.computedAt).sort().at(-1) ?? null,
+  };
+}

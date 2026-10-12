@@ -8,6 +8,7 @@ import { PortfolioRace, type RaceRow } from "@/components/portfolio-race";
 import { Skeleton } from "@/components/ui/skeleton";
 import { VIEWS, type ViewId } from "@/lib/catalog";
 import { formatHuman } from "@/lib/dates";
+import { thinSeries } from "@/lib/chart";
 import { FUND_EMOJI } from "@/lib/plain";
 import { allocation } from "@/lib/portfolio";
 import { metricTriples } from "@/lib/report/input";
@@ -102,8 +103,8 @@ async function Portfolio({ searchParams }: { searchParams: PageProps<"/portfolio
     };
   });
   const series: ChartSeries[] = [
-    ...d.performance.map((p) => ({ key: `f${p.schemeCode}`, name: short(p.schemeName), kind: "fund" as const, data: p.chart })),
-    ...d.indices.map((ix) => ({ key: ix.id, name: ix.name, kind: "index" as const, data: ix.chart })),
+    ...d.performance.map((p) => ({ key: `f${p.schemeCode}`, name: short(p.schemeName), kind: "fund" as const, data: thinSeries(p.chart) })),
+    ...d.indices.map((ix) => ({ key: ix.id, name: ix.name, kind: "index" as const, data: thinSeries(ix.chart) })),
   ];
   const first = d.performance[0];
   const initial = first ? [`f${first.schemeCode}`, first.benchmark?.id ?? "NIFTY50"] : ["NIFTY50"];

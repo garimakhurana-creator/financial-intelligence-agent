@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Term } from "@/components/term";
-import type { UniverseRow } from "@/lib/explore";
+import { expandRows, type CompactRow, type UniverseRow } from "@/lib/explore";
 import { cn } from "@/lib/utils";
 
 const pct = (n: number | null) => (n === null ? "—" : `${n > 0 ? "+" : ""}${n.toFixed(2)}%`);
@@ -254,18 +254,19 @@ const SORT_CHIPS: Chip[] = [
 ];
 
 export function ExploreWorkspace({
-  rows,
+  compact,
   shortlist,
   watched,
   admin,
   groups,
 }: {
-  rows: UniverseRow[];
+  compact: { rows: CompactRow[]; groupFacts: Parameters<typeof expandRows>[1] };
   shortlist: UniverseRow[];
   watched: number[];
   admin: boolean;
   groups: { key: string; label: string }[];
 }) {
+  const rows = useMemo(() => expandRows(compact.rows, compact.groupFacts), [compact]);
   const cmp = useCompare();
   const [q, setQ] = useState("");
   const [asset, setAsset] = useState("all");

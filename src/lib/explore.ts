@@ -125,3 +125,23 @@ export function shortlist(rows: UniverseRow[], prefs: Preferences | null, max = 
 export function groupLabelMap(groups: { groupKey: string; data: DiscoveryGroupData }[]): Record<string, string> {
   return Object.fromEntries(groups.map((g) => [g.groupKey, g.data.label]));
 }
+
+// ---------------------------------------------------------------------------------------------
+// Compact form for the browser: 617 funds share 19 categories, so category facts travel once.
+
+type GroupFacts = Pick<UniverseRow, "groupLabel" | "assetClass" | "riskBand" | "horizon" | "horizonYears">;
+export type CompactRow = Omit<UniverseRow, keyof GroupFacts | "plan" | "option" | "historyStart" | "rank" | "of" | "vsRef3">;
+
+export function compactRows(rows: UniverseRow[]): { rows: CompactRow[]; groupFacts: Record<string, GroupFacts> } {
+  const groupFacts: Record<string, GroupFacts> = {};
+  const out = rows.map((r) => {
+    groupFacts[r.group] ??= { groupLabel: r.groupLabel, assetClass: r.assetClass, riskBand: r.riskBand, horizon: r.horizon, horizonYears: r.horizonYears };
+    const { groupLabel: _a, assetClass: _b, riskBand: _c, horizon: _d, horizonYears: _e, plan: _f, option: _g, historyStart: _h, rank: _i, of: _j, vsRef3: _k, ...rest } = r;
+    return rest;
+  });
+  return { rows: out, groupFacts };
+}
+
+export function expandRows(rows: CompactRow[], groupFacts: Record<string, GroupFacts>): UniverseRow[] {
+  return rows.map((r) => ({ ...groupFacts[r.group], ...r, plan: "", option: "", historyStart: null, rank: null, of: 0, vsRef3: null }));
+}

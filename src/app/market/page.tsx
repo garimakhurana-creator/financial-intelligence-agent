@@ -7,6 +7,7 @@ import { NewsCenter, type NewsCard } from "@/components/news-center";
 import { NewsShorts, type ShortItem } from "@/components/news-shorts";
 import { MarketMood } from "@/components/home";
 import { PerformanceChart } from "@/components/performance-chart";
+import { thinSeries } from "@/lib/chart";
 import { Skeleton } from "@/components/ui/skeleton";
 import { VIEWS, type ViewId } from "@/lib/catalog";
 import { formatHuman } from "@/lib/dates";
@@ -316,7 +317,7 @@ async function Market({
                   key: i.id,
                   name: i.name,
                   kind: "index" as const,
-                  data: i.chart,
+                  data: thinSeries(i.chart),
                 }))}
               initial={["NIFTY50", "NIFTY_MIDCAP150", "NIFTY_SMALLCAP100"]}
             />

@@ -144,15 +144,10 @@ export async function loadMarket() {
 export async function loadExplore() {
   await connection();
   const admin = await isAdmin();
-  const [metrics, groups, prefs, watch] = await Promise.all([
-    cached.fundMetrics<import("@/lib/pipeline/discovery").DiscoveryFundData>(),
-    cached.discoveryGroups<import("@/lib/pipeline/discovery").DiscoveryGroupData>(),
+  const [explore, prefs, watch] = await Promise.all([
+    cached.exploreData(),
     admin ? research.getPreferences().catch(() => null) : Promise.resolve(null),
     admin ? research.listWatchlist().catch(() => []) : Promise.resolve([]),
   ]);
-  const { toUniverseRow, groupLabelMap } = await import("@/lib/explore");
-  const labels = groupLabelMap(groups);
-  const rows = metrics.map((m) => toUniverseRow(m, labels[m.groupKey] ?? m.groupKey)).filter((r): r is NonNullable<typeof r> => r !== null);
-  const computedAt = groups.map((g) => g.computedAt).sort().at(-1) ?? null;
-  return { admin, rows, groups, prefs, watch, computedAt };
+  return { admin, rows: explore.rows, groups: explore.groups, prefs, watch, computedAt: explore.computedAt };
 }
