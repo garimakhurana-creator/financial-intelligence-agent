@@ -28,7 +28,7 @@ export default function ReportsPage() {
           <span className="rounded-full bg-muted px-3 py-1">✈️ Telegram — key insights + PDF</span>
           <span className="rounded-full bg-muted px-3 py-1">💬 WhatsApp — key insights + PDF</span>
         </span>
-        <Link href="/#delivery" className="ml-auto text-sm font-medium text-brand hover:underline">
+        <Link href="/?delivery=open" className="ml-auto text-sm font-medium text-brand hover:underline">
           Send one to me now →
         </Link>
       </div>

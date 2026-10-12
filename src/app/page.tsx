@@ -2,7 +2,7 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { Download, MessageCircle } from "lucide-react";
 import { Highlights, PortfolioCards, QuickActions } from "@/components/dashboard";
-import { DeliveryCard, type ChannelInfo } from "@/components/delivery-card";
+import { DeliveryLauncher, type ChannelInfo } from "@/components/delivery-card";
 import { emailRecipientMasked, telegramRecipientMasked, whatsappRecipientMasked } from "@/lib/delivery/channels";
 import { whatsappTemplateState } from "@/lib/delivery/wa-status";
 import { FundCards, StoryStrip, WeatherHero } from "@/components/home";
@@ -16,10 +16,10 @@ import { loadDashboard } from "@/lib/view-data";
 // The dashboard is deliberately light: no chart library and no year-long series in the page.
 // Exact numbers and the comparison chart live on My Portfolio.
 
-export default function Dashboard() {
+export default function Dashboard({ searchParams }: PageProps<"/">) {
   return (
     <Suspense fallback={<DashboardSkeleton />}>
-      <DashboardContent />
+      <DashboardContent searchParams={searchParams} />
     </Suspense>
   );
 }
@@ -39,7 +39,8 @@ function greeting(now: Date) {
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 }
 
-async function DashboardContent() {
+async function DashboardContent({ searchParams }: { searchParams: PageProps<"/">["searchParams"] }) {
+  const openDelivery = (await searchParams).delivery === "open";
   let d;
   try {
     d = await loadDashboard();
@@ -105,6 +106,7 @@ async function DashboardContent() {
             >
               <Download className="size-4" aria-hidden /> Download report
             </a>
+            <DeliveryLauncher reportId={report.id} channels={channels} nextSend={nextSaturday(now)} nextShort={nextSaturday(now).replace(/^(\w{3})\w*,/, "$1").replace(/, 8 AM$/, "")} defaultOpen={openDelivery} />
           </div>
         )}
       </header>
@@ -112,8 +114,6 @@ async function DashboardContent() {
       <div className="fade-up">
         <WeatherHero label={report?.assessment ?? null} reason={report?.assessmentReason ?? null} weekEnding={report?.weekEnding ?? null} reportId={report?.id ?? null} checks={checks} summary={report ? shortVerdict(report, checks) : undefined} />
       </div>
-
-      <DeliveryCard reportId={report?.id ?? null} channels={channels} nextSend={nextSaturday(now)} />
 
       <section className="fade-up">
         <h2 className="text-xl font-bold">Your week in 30 seconds</h2>

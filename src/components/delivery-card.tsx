@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { Loader2, Send } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ChevronRight, Loader2, Send, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // "Your Saturday delivery": shows that the weekly report goes out on three channels, the state of
@@ -19,7 +19,7 @@ export interface ChannelInfo {
 
 const META: Record<ChannelInfo["id"], { emoji: string; name: string; what: string }> = {
   email: { emoji: "✉️", name: "Email", what: "The full report, nicely formatted" },
-  telegram: { emoji: "✈️", name: "Telegram", what: "Every fund's summary in a chat message" },
+  telegram: { emoji: "✈️", name: "Telegram", what: "Key insights, news and the PDF" },
   whatsapp: { emoji: "💬", name: "WhatsApp", what: "Key insights with the PDF attached" },
 };
 
@@ -34,7 +34,7 @@ const STATUS_WORDS: Record<string, string> = {
 
 type Result = { ok: boolean; text: string };
 
-export function DeliveryCard({ reportId, channels, nextSend }: { reportId: string | null; channels: ChannelInfo[]; nextSend: string }) {
+export function DeliveryCard({ reportId, channels, nextSend, inDrawer = false }: { reportId: string | null; channels: ChannelInfo[]; nextSend: string; inDrawer?: boolean }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<Partial<Record<ChannelInfo["id"], Result>>>({});
@@ -68,7 +68,7 @@ export function DeliveryCard({ reportId, channels, nextSend }: { reportId: strin
   }
 
   return (
-    <section id="delivery" className="scroll-mt-20 rounded-3xl border bg-card p-5 shadow-card sm:p-6">
+    <section id="delivery" className={cn("scroll-mt-20", !inDrawer && "rounded-3xl border bg-card p-5 shadow-card sm:p-6")}>
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold">
@@ -91,7 +91,7 @@ export function DeliveryCard({ reportId, channels, nextSend }: { reportId: strin
         )}
       </div>
 
-      <ul className="mt-5 grid gap-3 md:grid-cols-3">
+      <ul className={cn("mt-5 grid gap-3", !inDrawer && "md:grid-cols-3")}>
         {channels.map((c) => {
           const m = META[c.id];
           const r = results[c.id];
@@ -133,5 +133,60 @@ export function DeliveryCard({ reportId, channels, nextSend }: { reportId: strin
       </ul>
       <p className="mt-3 text-xs text-muted-foreground">&ldquo;Send now&rdquo; messages are labelled TEST so they never get mixed up with the Saturday report.</p>
     </section>
+  );
+}
+
+/**
+ * A small bar for the dashboard header: "📬 Saturday delivery ✉️ ✈️ 💬 · Next …". Clicking it
+ * slides the full delivery card in from the right.
+ */
+export function DeliveryLauncher({ reportId, channels, nextSend, nextShort, defaultOpen = false }: { reportId: string | null; channels: ChannelInfo[]; nextSend: string; nextShort: string; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && setOpen(false);
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+  const ready = channels.filter((c) => c.configured && !c.note).length;
+
+  return (
+    <>
+      {/* A slim tab on the right edge of the screen, half-way down. */}
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-haspopup="dialog"
+        aria-expanded={open}
+        aria-label={`Saturday delivery: ${ready} of ${channels.length} channels ready, next ${nextShort}`}
+        title={`Next delivery ${nextShort}`}
+        className="fixed right-0 top-1/2 z-40 flex -translate-y-1/2 flex-col items-center gap-2 rounded-l-2xl border border-r-0 bg-card px-2 py-3 text-sm shadow-card transition-[padding] hover:bg-muted hover:pr-3 print:hidden"
+      >
+        <span aria-hidden>📬</span>
+        <span className="font-semibold [writing-mode:vertical-rl] rotate-180">Delivery</span>
+        <span aria-hidden className="flex flex-col gap-1 text-xs leading-none">
+          {channels.map((c) => (
+            <span key={c.id} className={cn(!c.configured || c.note ? "opacity-50" : "")}>
+              {META[c.id].emoji}
+            </span>
+          ))}
+        </span>
+        <ChevronRight className="size-3.5 rotate-180 text-muted-foreground" aria-hidden />
+      </button>
+
+      {open && (
+        <div className="fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Your Saturday delivery">
+          <button type="button" aria-label="Close" className="absolute inset-0 bg-black/40" onClick={() => setOpen(false)} />
+          <div className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col overflow-y-auto border-l bg-[var(--page)] p-5 shadow-2xl sm:p-6">
+            <div className="mb-2 flex justify-end">
+              <button type="button" onClick={() => setOpen(false)} aria-label="Close" className="rounded-full p-2 hover:bg-muted">
+                <X className="size-5" aria-hidden />
+              </button>
+            </div>
+            <DeliveryCard reportId={reportId} channels={channels} nextSend={nextSend} inDrawer />
+          </div>
+        </div>
+      )}
+    </>
   );
 }
