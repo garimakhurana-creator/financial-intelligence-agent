@@ -19,6 +19,19 @@ export default function ReportsPage() {
         sub="Every Saturday report, kept with the exact data it was written from. Opening an old report never refreshes or changes it."
         crumbs={[{ href: "/", label: "Dashboard" }]}
       />
+      <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-3xl border bg-card px-5 py-4 shadow-card">
+        <span className="font-semibold">
+          <span aria-hidden>📬</span> Delivered every Saturday at 8 AM
+        </span>
+        <span className="flex flex-wrap gap-2 text-sm">
+          <span className="rounded-full bg-muted px-3 py-1">✉️ Email — full report</span>
+          <span className="rounded-full bg-muted px-3 py-1">✈️ Telegram — key insights + PDF</span>
+          <span className="rounded-full bg-muted px-3 py-1">💬 WhatsApp — key insights + PDF</span>
+        </span>
+        <Link href="/#delivery" className="ml-auto text-sm font-medium text-brand hover:underline">
+          Send one to me now →
+        </Link>
+      </div>
       <Suspense fallback={<Skeleton className="h-64 w-full rounded-2xl" />}>
         <Archive />
       </Suspense>

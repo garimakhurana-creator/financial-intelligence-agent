@@ -113,6 +113,8 @@ async function DashboardContent() {
         <WeatherHero label={report?.assessment ?? null} reason={report?.assessmentReason ?? null} weekEnding={report?.weekEnding ?? null} reportId={report?.id ?? null} checks={checks} summary={report ? shortVerdict(report, checks) : undefined} />
       </div>
 
+      <DeliveryCard reportId={report?.id ?? null} channels={channels} nextSend={nextSaturday(now)} />
+
       <section className="fade-up">
         <h2 className="text-xl font-bold">Your week in 30 seconds</h2>
         <p className="mb-4 text-sm text-muted-foreground">Swipe through →</p>
@@ -128,8 +130,6 @@ async function DashboardContent() {
         </div>
         <FundCards funds={d.performance} />
       </section>
-
-      <DeliveryCard reportId={report?.id ?? null} channels={channels} nextSend={nextSaturday(now)} />
 
       {d.highlights.length > 0 && (
         <section>

@@ -68,7 +68,7 @@ export function DeliveryCard({ reportId, channels, nextSend }: { reportId: strin
   }
 
   return (
-    <section className="rounded-3xl border bg-card p-5 shadow-card sm:p-6">
+    <section id="delivery" className="scroll-mt-20 rounded-3xl border bg-card p-5 shadow-card sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-xl font-bold">
