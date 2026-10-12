@@ -286,3 +286,13 @@ describe("how we decided (lagChecks)", () => {
     ]);
   });
 });
+
+describe("one-line verdict for the dashboard card", () => {
+  it("names the flagged fund in one short sentence", async () => {
+    const { shortVerdict } = await import("@/lib/report/checks");
+    const report = { inputSnapshot: { screening: { notes: { marketDip: [{ name: "X", fund: -3, market: -3 }], yearLag: [] } } } } as never;
+    const one = [{ name: "Sundaram Mid Cap", month: -1.62, year: -4.36, monthBehind: true, yearBehind: true, flagged: true }];
+    expect(shortVerdict(report, one)).toBe("Sundaram Mid Cap has been behind similar funds this month and this year. Your other funds are on track.");
+    expect(shortVerdict(report, [])).toBe("No fund has a problem of its own. This month's fall was market-wide.");
+  });
+});

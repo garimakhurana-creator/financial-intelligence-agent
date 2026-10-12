@@ -7,7 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { reportUrl } from "@/lib/delivery/deliver";
 import { whatsappShareLink, whatsappShareText } from "@/lib/delivery/share";
 import { optionalEnv } from "@/lib/env";
-import { reportChecks } from "@/lib/report/checks";
+import { reportChecks, shortVerdict } from "@/lib/report/checks";
 import { loadDashboard } from "@/lib/view-data";
 
 // The dashboard is deliberately light: no chart library and no year-long series in the page.
@@ -45,6 +45,7 @@ async function DashboardContent() {
   // Number-less wa.me link: WhatsApp asks which chat to send it to (herself, or her CA friend).
   const share = report ? whatsappShareLink(whatsappShareText(report, reportUrl(report.id))) : null;
   const hasHoldings = (d.portfolio?.holdingsCount ?? 0) > 0;
+  const checks = report ? reportChecks(report) : [];
 
   return (
     <div className="space-y-10">
@@ -80,7 +81,7 @@ async function DashboardContent() {
       </header>
 
       <div className="fade-up">
-        <WeatherHero label={report?.assessment ?? null} reason={report?.assessmentReason ?? null} weekEnding={report?.weekEnding ?? null} reportId={report?.id ?? null} checks={report ? reportChecks(report) : []} />
+        <WeatherHero label={report?.assessment ?? null} reason={report?.assessmentReason ?? null} weekEnding={report?.weekEnding ?? null} reportId={report?.id ?? null} checks={checks} summary={report ? shortVerdict(report, checks) : undefined} />
       </div>
 
       <section className="fade-up">
