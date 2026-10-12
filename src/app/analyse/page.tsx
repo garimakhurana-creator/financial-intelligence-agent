@@ -3,6 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { AnalyseForm } from "@/components/analyse-form";
+import { PortfolioCheck } from "@/components/portfolio-check";
 import { Card, PageHeader } from "@/components/page-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { isAdmin } from "@/lib/auth";
@@ -16,7 +17,7 @@ export default function AnalysePage({ searchParams }: PageProps<"/analyse">) {
       <PageHeader
         icon={FileSearch}
         title="Analyse a Fund"
-        sub="Thinking about a fund? Get an evidence-based research report: returns against similar funds, consistency, risk, costs, strengths, concerns and alternatives."
+        sub="Thinking about a fund? Get an evidence-based research report — or check someone else's portfolio and see if any of their funds are worth a look."
         crumbs={[{ href: "/", label: "Dashboard" }]}
       />
       <Suspense fallback={<Skeleton className="h-96 w-full rounded-2xl" />}>
@@ -44,6 +45,7 @@ async function Analyse({ searchParams }: { searchParams: PageProps<"/analyse">["
       <Card>
         <AnalyseForm initialCode={code} />
       </Card>
+      <PortfolioCheck />
       {admin ? (
       <section>
         <h2 className="mb-3 text-lg font-semibold">Your saved analyses</h2>

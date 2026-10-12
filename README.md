@@ -82,6 +82,7 @@ is available. Every action is rate-limited per IP: 120 writes an hour in general
   refused, and any answer that fails the checks falls back to a safe reply.
 - **Glossary** (`/glossary`): about 50 plain-language terms with examples. Underlined terms across the app show a
   short definition on hover and link to the full entry.
+- **Someone else's portfolio** (Analyse a Fund): upload a statement (PDF, screenshot or CSV) or paste fund names. Gemini reads the holdings (for text documents every name must appear in the document); each is matched to a real scheme in AMFI's list (near-exact matches only, including renamed funds' former names; anything unclear is listed as not recognised). Each fund gets a plain-language verdict from its long-term record against similar funds, the portfolio mix is shown, and each fund is marked for Meera as already held / similar to one she has / adds something new / probably not needed. Nothing is stored.
 - **Calculator** (`/calculator`): monthly SIP, one-time and reach-a-goal maths with a growth chart; rate presets are the tracked funds' real past 3-year averages, labelled as history, not a forecast.
 - **Send to WhatsApp / Download report** (top of the dashboard): a one-tap WhatsApp share of the latest report, and the full report as a PDF (`/api/reports/[id]/pdf`) in the brief's order.
 - **Analyse a Fund** compares any fund with its own AMFI category (same theme or index where the name shows one), computed live, so sector, theme and newer funds get a comparison too; funds under 3 years are judged on their last year.
