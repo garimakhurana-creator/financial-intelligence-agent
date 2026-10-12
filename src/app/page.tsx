@@ -106,7 +106,6 @@ async function DashboardContent({ searchParams }: { searchParams: PageProps<"/">
             >
               <Download className="size-4" aria-hidden /> Download report
             </a>
-            <DeliveryLauncher reportId={report.id} channels={channels} nextSend={nextSaturday(now)} nextShort={nextSaturday(now).replace(/^(\w{3})\w*,/, "$1").replace(/, 8 AM$/, "")} defaultOpen={openDelivery} />
           </div>
         )}
       </header>
@@ -146,6 +145,17 @@ async function DashboardContent({ searchParams }: { searchParams: PageProps<"/">
         <h2 className="mb-4 text-xl font-bold">Explore more</h2>
         <QuickActions reportId={report?.id ?? null} />
       </section>
+
+      {/* Kept out of the animated header: an ancestor that moves would pin this "fixed" tab to itself instead of the screen. */}
+      {report && (
+        <DeliveryLauncher
+          reportId={report.id}
+          channels={channels}
+          nextSend={nextSaturday(now)}
+          nextShort={nextSaturday(now).replace(/^(\w{3})\w*,/, "$1").replace(/, 8 AM$/, "")}
+          defaultOpen={openDelivery}
+        />
+      )}
     </div>
   );
 }
