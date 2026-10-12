@@ -1,11 +1,6 @@
 # Components Map
 
-**Swimlane map (submission format):** [components-map.svg](components-map.svg) · live at
-https://financial-intelligence-agent-lake.vercel.app/components-map.html (regenerate with `node scripts/make-components-map.mjs`).
-Actors (Vercel Cron, Meera, MFapi/AMFI, Yahoo/NSE, Tavily/GNews, the Next.js engine, Gemini Flash, Nhost Postgres,
-delivery channels) × Trigger → Input → Context → Processing → AI → Output.
-
-The detailed map below ties the same pieces to the files that implement them. Arrows show data flow.
+How the pieces fit together, mapped to the files that implement them. Arrows show data flow.
 
 ```
                 ┌─────────────────────────── EXTERNAL SOURCES ───────────────────────────┐
