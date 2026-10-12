@@ -120,3 +120,32 @@ export function suggestLabel(flagged: { name: string; reason: string }[], notes:
     rationale: `${flagged.length} funds have been lagging similar funds for a while (${flagged.map((f) => f.name).join(", ")}), so it may be worth a closer look at the mix.`,
   };
 }
+
+export interface LagCheck {
+  name: string;
+  /** Gap to similar funds, percentage points (negative = behind). */
+  month: number | null;
+  year: number | null;
+  monthBehind: boolean;
+  yearBehind: boolean;
+  flagged: boolean;
+}
+
+/**
+ * The flag rule made visible: for every fund that is behind similar funds in at least one of the
+ * two windows (by the flag thresholds), show both checks and whether it was flagged. A fund is
+ * flagged only when both checks fail. Index funds use a tracking rule instead and are listed only
+ * if flagged.
+ */
+export function lagChecks(funds: { name: string; view: ViewId | null; returns: Record<WindowKey, MetricTriple> }[]): LagCheck[] {
+  return funds.flatMap((f) => {
+    const s = screenFund(f.view, f.returns);
+    const t = f.view === "short_debt" ? THRESHOLDS.debt : THRESHOLDS.equity;
+    const month = f.returns["1M"].vsPeerPp;
+    const year = f.returns["YTD"].vsPeerPp;
+    const monthBehind = month !== null && month <= t.vsPeer1M;
+    const yearBehind = year !== null && year <= t.vsPeerYTD;
+    if (f.view === "large_cap_index" ? !s.flag : !(monthBehind || yearBehind)) return [];
+    return [{ name: f.name, month, year, monthBehind, yearBehind, flagged: s.flag }];
+  });
+}

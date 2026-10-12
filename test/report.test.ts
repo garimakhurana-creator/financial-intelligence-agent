@@ -270,3 +270,19 @@ describe("closing summary mentions unflagged year-long lags", () => {
     expect(validateReport(o, input).errors.join()).not.toMatch(/mention that Nippon/);
   });
 });
+
+describe("how we decided (lagChecks)", () => {
+  it("shows both checks so a fund behind only this year is clearly not flagged", async () => {
+    const { lagChecks } = await import("@/lib/report/screening");
+    const r = (m: number, y: number) => ({ "1W": triple(0, 0), "1M": triple(m, 0), YTD: triple(y, 0) });
+    const checks = lagChecks([
+      { name: "Sundaram Mid Cap", view: "mid_cap", returns: r(-1.62, -4.36) },
+      { name: "Nippon India Small Cap", view: "small_cap", returns: r(0.28, -3.59) },
+      { name: "HDFC Short Term", view: "short_debt", returns: r(-0.09, -0.13) },
+    ]);
+    expect(checks.map((c) => [c.name, c.monthBehind, c.yearBehind, c.flagged])).toEqual([
+      ["Sundaram Mid Cap", true, true, true],
+      ["Nippon India Small Cap", false, true, false],
+    ]);
+  });
+});

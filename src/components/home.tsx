@@ -6,7 +6,7 @@ import { cleanTitle, topicArt } from "@/lib/news/art";
 import type { FundPerformance, IndexPerformance } from "@/lib/pipeline/data";
 import { describeMove, describeVsPeers, FUND_EMOJI, FUND_GRADIENT, FUND_KIND, INDEX_WORDS, thousandBecomes, WEEK_WEATHER } from "@/lib/plain";
 import { metricTriples } from "@/lib/report/input";
-import { screenFund } from "@/lib/report/screening";
+import { screenFund, type LagCheck } from "@/lib/report/screening";
 import type { ViewId } from "@/lib/catalog";
 import { cn } from "@/lib/utils";
 
@@ -42,7 +42,41 @@ export function fundStatus(f: FundPerformance): { emoji: string; text: string; c
 
 // ---------------------------------------------------------------------------------------------
 
-export function WeatherHero({ label, reason, weekEnding, reportId }: { label: string | null; reason: string | null; weekEnding: string | null; reportId: string | null }) {
+function CheckPill({ label, gap, behind }: { label: string; gap: number | null; behind: boolean }) {
+  const text = gap === null ? "no data" : Math.abs(gap) < 0.005 ? "level" : gap > 0 ? `ahead ${gap.toFixed(2)}` : `behind ${Math.abs(gap).toFixed(2)}`;
+  return (
+    <span className={cn("inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium", behind ? "bg-[#fecaca] text-[#7f1d1d]" : "bg-[#bbf7d0] text-[#14532d]")}>
+      <span aria-hidden>{behind ? "✗" : "✓"}</span> {label}: {text}
+      {gap !== null && Math.abs(gap) >= 0.005 && " pts"}
+    </span>
+  );
+}
+
+/** "How we decided": each lagging fund's two checks, so it is clear why one is flagged and another not. */
+function DecisionPanel({ checks }: { checks: LagCheck[] }) {
+  return (
+    <div className="mt-5 rounded-2xl bg-white/55 p-4 backdrop-blur-sm">
+      <div className="text-sm font-semibold">How we decided</div>
+      <p className="mt-0.5 text-xs opacity-80">A fund is flagged only when it is behind similar funds both this month and this year — one bad stretch is not enough.</p>
+      <ul className="mt-3 space-y-2.5">
+        {checks.map((c) => (
+          <li key={c.name} className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+            <span className="text-sm font-semibold">{c.name}</span>
+            <span className="flex flex-wrap items-center gap-1.5">
+              <CheckPill label="This month" gap={c.month} behind={c.monthBehind} />
+              <CheckPill label="This year" gap={c.year} behind={c.yearBehind} />
+              <span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", c.flagged ? "bg-[#16181d] text-white" : "bg-white/80")}>
+                {c.flagged ? "👀 Worth watching" : "🙂 Not flagged — needs both"}
+              </span>
+            </span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+export function WeatherHero({ label, reason, weekEnding, reportId, checks = [] }: { label: string | null; reason: string | null; weekEnding: string | null; reportId: string | null; checks?: LagCheck[] }) {
   const w = label ? WEEK_WEATHER[label] : null;
   if (!w) {
     return (
@@ -60,10 +94,11 @@ export function WeatherHero({ label, reason, weekEnding, reportId }: { label: st
       <span aria-hidden className="float-slow pointer-events-none absolute -right-4 -top-6 text-[9rem] leading-none sm:right-6 sm:top-2 sm:text-[10rem]">
         {w.emoji}
       </span>
-      <div className="relative max-w-xl">
+      <div className="relative max-w-2xl">
         <p className="text-sm font-medium opacity-70">This week{weekEnding ? ` · up to ${formatHuman(weekEnding)}` : ""}</p>
         <h2 className="font-display mt-1 text-3xl font-bold tracking-tight sm:text-4xl">{w.title}</h2>
         {reason && <p className="mt-3 text-[17px] font-medium leading-relaxed">{reason}</p>}
+        {checks.length > 0 && <DecisionPanel checks={checks} />}
         <div className="mt-5 flex flex-wrap items-center gap-3">
           {reportId && (
             <Link href={`/reports/${reportId}`} className="inline-flex items-center gap-1.5 rounded-full bg-[#16181d] px-4 py-2 text-sm font-medium text-white hover:bg-black">

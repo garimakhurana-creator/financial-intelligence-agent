@@ -7,6 +7,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { reportUrl } from "@/lib/delivery/deliver";
 import { whatsappShareLink, whatsappShareText } from "@/lib/delivery/share";
 import { optionalEnv } from "@/lib/env";
+import { reportChecks } from "@/lib/report/checks";
 import { loadDashboard } from "@/lib/view-data";
 
 // The dashboard is deliberately light: no chart library and no year-long series in the page.
@@ -79,7 +80,7 @@ async function DashboardContent() {
       </header>
 
       <div className="fade-up">
-        <WeatherHero label={report?.assessment ?? null} reason={report?.assessmentReason ?? null} weekEnding={report?.weekEnding ?? null} reportId={report?.id ?? null} />
+        <WeatherHero label={report?.assessment ?? null} reason={report?.assessmentReason ?? null} weekEnding={report?.weekEnding ?? null} reportId={report?.id ?? null} checks={report ? reportChecks(report) : []} />
       </div>
 
       <section className="fade-up">

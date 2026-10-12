@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { NewsList, SectionTitle, WINDOW_LABEL } from "@/components/blocks";
 import { WeatherHero } from "@/components/home";
+import { reportChecks } from "@/lib/report/checks";
 import { KindTabs } from "@/components/kind-tabs";
 import {
   DateText,
@@ -627,6 +628,7 @@ async function Report({
           reason={report.assessmentReason}
           weekEnding={report.weekEnding}
           reportId={null}
+          checks={reportChecks(report)}
         />
       </section>
 
