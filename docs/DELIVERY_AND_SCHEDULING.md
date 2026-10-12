@@ -114,3 +114,21 @@ Setup steps (owner):
 | WhatsApp code 132001 (template does not exist) | Template name/language mismatch or not approved yet |
 | Smallcap 100 missing | NSE blocked the request — check Vercel region is `bom1`; data is shown as unavailable, not substituted |
 | Report says "automated summary" | Gemini failed 3× — meta.validationErrors on the report row explains why |
+
+## Monitoring and alerts
+
+Two layers, so a problem is reported even when the app itself cannot run:
+
+1. **In-app alerts** (`src/lib/alerts.ts`, called from both cron routes). If the nightly refresh or the
+   Saturday run fails, finishes partially (e.g. a fund's NAV could not be fetched) or a delivery fails,
+   or the job crashes outright, the owner gets a ⚠️ message on Telegram and by email naming the failed
+   steps. Sending an alert never breaks the job.
+2. **Outside watchdog** (`.github/workflows/watchdog.yml`, GitHub Actions, every 6 hours). It calls
+   `/api/health/check` (Bearer `HEALTH_TOKEN`), which reads live data and reports a problem when the
+   database is unreachable (Nhost paused or down), the nightly job has not run for 30+ hours (Vercel cron
+   paused), the last nightly run failed, fund prices are more than 5 days old, Saturday's report run is
+   missing or failed after 10:00 IST, or a WhatsApp template is rejected, paused or the token has
+   expired. On a problem it messages the owner on Telegram and fails the run, so GitHub also emails the
+   repo owner. Run it by hand from the Actions tab (Watchdog → Run workflow, tick "test" for a test
+   message). Secrets: `HEALTH_TOKEN`, `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID`.
+   Note: GitHub pauses scheduled workflows in a repository with no commits for 60 days.

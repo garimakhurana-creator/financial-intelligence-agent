@@ -1,0 +1,57 @@
+# Outside watchdog: every 6 hours, ask the live app's deep health check whether anything needs
+# attention (site or database down/paused, nightly job missing or failed, stale prices, Saturday
+# report missing, WhatsApp template rejected). On a problem it messages the owner on Telegram and
+# fails the run, so GitHub also emails the repo owner. Runs independently of Vercel and Nhost.
+name: Watchdog
+
+on:
+  schedule:
+    - cron: "15 */6 * * *"
+  workflow_dispatch:
+    inputs:
+      test:
+        description: "Send a test Telegram message even if everything is fine"
+        type: boolean
+        default: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check the live app
+        env:
+          APP_URL: https://financial-intelligence-agent-lake.vercel.app
+          HEALTH_TOKEN: ${{ secrets.HEALTH_TOKEN }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          SEND_TEST: ${{ inputs.test }}
+        run: |
+          set +e
+          notify() {
+            curl -sS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+              --data-urlencode "chat_id=${TELEGRAM_CHAT_ID}" \
+              --data-urlencode "text=$1" \
+              --data-urlencode "disable_web_page_preview=true" > /dev/null
+          }
+          response=$(curl -sS --max-time 60 -w '\n%{http_code}' -H "Authorization: Bearer ${HEALTH_TOKEN}" "${APP_URL}/api/health/check")
+          code=$(printf '%s' "$response" | tail -n1)
+          body=$(printf '%s' "$response" | sed '$d')
+          ok=$(printf '%s' "$body" | jq -r '.ok' 2>/dev/null)
+
+          if [ "$code" = "200" ] && [ "$ok" = "true" ]; then
+            echo "All checks passed."
+            if [ "$SEND_TEST" = "true" ]; then
+              notify "✅ Meera's Money watchdog (test): all checks passed — site, database, nightly refresh, prices and Saturday report are fine. You'll get a message here if anything goes wrong."
+            fi
+            exit 0
+          fi
+
+          if [ "$code" != "200" ]; then
+            problems="• The app did not answer the health check (HTTP ${code}). The site, Vercel or the Nhost database may be down or paused."
+          else
+            problems=$(printf '%s' "$body" | jq -r '.problems | map("• " + .) | join("\n")')
+          fi
+          notify "$(printf '⚠️ Meera%sMoney watchdog\n\n%s\n\nRun history: %s/manage' "'s " "$problems" "$APP_URL")"
+          printf '%s\n' "$problems"
+          exit 1
