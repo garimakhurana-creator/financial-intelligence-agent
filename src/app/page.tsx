@@ -2,6 +2,9 @@ import Link from "next/link";
 import { Suspense } from "react";
 import { Download, MessageCircle } from "lucide-react";
 import { Highlights, PortfolioCards, QuickActions } from "@/components/dashboard";
+import { DeliveryCard, type ChannelInfo } from "@/components/delivery-card";
+import { emailRecipientMasked, telegramRecipientMasked, whatsappRecipientMasked } from "@/lib/delivery/channels";
+import { whatsappTemplateState } from "@/lib/delivery/wa-status";
 import { FundCards, StoryStrip, WeatherHero } from "@/components/home";
 import { Skeleton } from "@/components/ui/skeleton";
 import { reportUrl } from "@/lib/delivery/deliver";
@@ -19,6 +22,16 @@ export default function Dashboard() {
       <DashboardContent />
     </Suspense>
   );
+}
+
+/** "Saturday 17 Oct, 8 AM" — the next weekly send (Saturdays 08:00 IST). */
+function nextSaturday(now: Date): string {
+  const ist = new Date(now.getTime() + 5.5 * 3600_000);
+  const day = ist.getUTCDay();
+  const beforeSend = day === 6 && ist.getUTCHours() < 8;
+  const add = beforeSend ? 0 : (6 - day + 7) % 7 || 7;
+  const target = new Date(Date.UTC(ist.getUTCFullYear(), ist.getUTCMonth(), ist.getUTCDate() + add));
+  return `${target.toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "short", timeZone: "UTC" })}, 8 AM`;
 }
 
 function greeting(now: Date) {
@@ -46,6 +59,22 @@ async function DashboardContent() {
   const share = report ? whatsappShareLink(whatsappShareText(report, reportUrl(report.id))) : null;
   const hasHoldings = (d.portfolio?.holdingsCount ?? 0) > 0;
   const checks = report ? reportChecks(report) : [];
+  const wa = await whatsappTemplateState();
+  const lastOf = (ch: ChannelInfo["id"]) => {
+    const x = d.deliveries.find((dl) => dl.channel === ch);
+    return x ? { status: x.status, at: x.updatedAt ?? x.createdAt, isTest: x.isTest } : null;
+  };
+  const channels: ChannelInfo[] = [
+    { id: "email", configured: d.integrations.email, recipient: emailRecipientMasked(), last: lastOf("email"), note: null },
+    { id: "telegram", configured: d.integrations.telegram, recipient: telegramRecipientMasked(), last: lastOf("telegram"), note: null },
+    {
+      id: "whatsapp",
+      configured: d.integrations.whatsapp,
+      recipient: whatsappRecipientMasked(),
+      last: lastOf("whatsapp"),
+      note: wa.approved ? null : wa.pending.length ? "Set up and tested — waiting for Meta to approve the message template. Email and Telegram cover it meanwhile." : null,
+    },
+  ];
 
   return (
     <div className="space-y-10">
@@ -99,6 +128,8 @@ async function DashboardContent() {
         </div>
         <FundCards funds={d.performance} />
       </section>
+
+      <DeliveryCard reportId={report?.id ?? null} channels={channels} nextSend={nextSaturday(now)} />
 
       {d.highlights.length > 0 && (
         <section>

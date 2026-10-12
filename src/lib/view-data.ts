@@ -34,6 +34,7 @@ export async function loadDashboard() {
     admin ? research.listHoldings().catch(() => []) : Promise.resolve([]),
   ]);
   const latestReport = latestReportMeta[0] ? await cached.report<ReportPayload, ReportInput>(latestReportMeta[0].id) : null;
+  const deliveries = latestReport ? await repo.listDeliveries(latestReport.id).catch(() => []) : [];
   const news = latestReport ? latestReport.report.news.slice(0, 6) : [];
   const withPeer = performance.map((p, i) => ({ ...p, peerKey: funds[i].peerKey }));
   const portfolio = admin ? summarisePortfolio(holdings, withPeer) : null;
@@ -46,7 +47,7 @@ export async function loadDashboard() {
     .sort((x, y) => Number(y.views.some((v) => tracked.has(v))) - Number(x.views.some((v) => tracked.has(v))))
     .slice(0, 3)
     .map((n) => ({ id: n.id, title: n.title, topics: n.topics }));
-  return { asOf, admin, funds, performance, headline, snapshot, latestReport, news, runs, lastRefresh, portfolio, highlights, storyNews, integrations: integrationStatus() };
+  return { asOf, admin, funds, performance, headline, snapshot, latestReport, news, runs, lastRefresh, portfolio, highlights, storyNews, deliveries, integrations: integrationStatus() };
 }
 
 export async function loadFund(schemeCode: number) {
