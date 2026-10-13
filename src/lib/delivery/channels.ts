@@ -92,11 +92,11 @@ export function fundsLine(report: StoredWeeklyReport): string {
     .map((f) => {
       const w = f.windows["1W"];
       const gap = w.vsPeerPp;
-      const words =
-        gap === null ? "" : Math.abs(gap) < 0.1 ? " (in line with similar funds)" : Math.abs(gap) < 1 ? (gap > 0 ? " (slightly ahead of similar funds)" : " (slightly behind similar funds)") : gap > 0 ? " (ahead of similar funds)" : " (behind similar funds)";
+      const words = gap === null ? "" : Math.abs(gap) < 0.1 ? " (in line)" : Math.abs(gap) < 1 ? (gap > 0 ? " (slightly ahead)" : " (slightly behind)") : gap > 0 ? " (ahead)" : " (behind)";
       return `${FUND_EMOJI_BY_VIEW[f.viewId ?? ""] ?? "•"} ${waName(f.schemeName)} ${signedPct(w.fund.returnPct)}${words}`;
     })
-    .join(" · ");
+    .join(" · ")
+    .replace(/^/, "vs similar funds — ");
 }
 
 /** Whole sentences from the start of `text` that fit in `max` characters (at least the first, trimmed). */
@@ -119,12 +119,33 @@ export function whatsappPdfParams(report: StoredWeeklyReport, reportUrl: string,
   const [firstSentence, ...rest] = out.assessment.reason.trim().split(/(?<=[.!?])\s+/);
   const labelStart = out.assessment.label.toLowerCase().split(" ").slice(0, 2).join(" ");
   const reason = rest.length && firstSentence.toLowerCase().includes(labelStart) ? rest.join(" ") : out.assessment.reason;
-  const overall = templateText(`${opts.isTest ? "[TEST] " : ""}${out.assessment.label}. ${reason}`, 420);
-  const funds = templateText(fundsLine(report), 330);
-  const fixed = WHATSAPP_PDF_BODY.replace(/\{\{\d\}\}/g, "").length + name.length + week.length + overall.length + funds.length + reportUrl.length;
-  const market = sentencesWithin(out.marketSummary.text, Math.max(80, WHATSAPP_BODY_LIMIT - fixed - 40));
-  return [name, week, overall, funds, templateText(market, 400), reportUrl];
+  let overall = templateText(`${opts.isTest ? "[TEST] " : ""}${out.assessment.label}. ${reason}`, 420);
+  const funds = templateText(fundsLine(report), 360);
+  let market = templateText(out.marketSummary.text, 400);
+
+  // Meta's limit covers the template text WITH its {{n}} placeholders plus every parameter, and
+  // counts emoji and symbols like "·" and "—" as more than one character. Budget in UTF-8 bytes
+  // (never fewer than Meta's count), keep a margin, and trim the market line, then the verdict.
+  const budget = WHATSAPP_BODY_LIMIT - WHATSAPP_MARGIN;
+  const size = () => whatsappMetaSize([name, week, overall, funds, market, reportUrl]);
+  const shorten = (s: string, min: number) => {
+    const cut = s.lastIndexOf(" ", s.length - 12);
+    return cut > min ? `${s.slice(0, cut).replace(/[,.;:—–-]+$/, "")}…` : s;
+  };
+  if (size() > budget) market = sentencesWithin(out.marketSummary.text, Math.max(60, market.length - (size() - budget)));
+  for (let guard = 0; size() > budget && guard < 200; guard++) {
+    const next = market.length > 60 ? shorten(market, 40) : shorten(overall, 80);
+    if (next === market || next === overall) break;
+    if (market.length > 60) market = next;
+    else overall = next;
+  }
+  return [name, week, overall, funds, market, reportUrl];
 }
+
+/** Size as WhatsApp may count it: UTF-8 bytes (always ≥ the character count Meta enforces). */
+export const whatsappMetaSize = (params: string[]) => whatsappSize(WHATSAPP_PDF_BODY) + params.reduce((s, x) => s + whatsappSize(x), 0);
+export const whatsappSize = (s: string) => new TextEncoder().encode(s).length;
+const WHATSAPP_MARGIN = 24;
 
 /** The message as WhatsApp will show it (for previews and tests). */
 export function renderWhatsAppBody(params: string[]): string {
@@ -205,8 +226,8 @@ export async function sendWhatsApp(report: StoredWeeklyReport, reportUrl: string
   const richBody = { type: "body", parameters: whatsappPdfParams(report, reportUrl, opts).map((t) => ({ type: "text", text: t })) };
   const attempts = [
     { name: process.env.WHATSAPP_PDF_TEMPLATE_NAME?.trim(), components: [header, richBody], detail: "sent with key insights and the PDF report attached" },
-    { name: process.env.WHATSAPP_PDF_TEMPLATE_SHORT?.trim(), components: [header, body], detail: "sent with the PDF report attached (short message — the richer template is not approved yet)" },
-    { name: env.WHATSAPP_TEMPLATE_NAME, components: [body], detail: "PDF templates not approved yet — sent the summary with the report link" },
+    { name: process.env.WHATSAPP_PDF_TEMPLATE_SHORT?.trim(), components: [header, body], detail: "sent with the PDF report attached (short message — the richer template could not be used)" },
+    { name: env.WHATSAPP_TEMPLATE_NAME, components: [body], detail: "PDF templates could not be used — sent the summary with the report link" },
   ].filter((a): a is { name: string; components: typeof a.components; detail: string } => Boolean(a.name));
 
   for (const [i, a] of attempts.entries()) {

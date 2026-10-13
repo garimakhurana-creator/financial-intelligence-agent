@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { reportPdfUrl, renderWhatsAppBody, sendWhatsApp, WHATSAPP_BODY_LIMIT, whatsappPdfParams } from "@/lib/delivery/channels";
+import { reportPdfUrl, renderWhatsAppBody, sendWhatsApp, WHATSAPP_BODY_LIMIT, whatsappMetaSize, whatsappPdfParams } from "@/lib/delivery/channels";
 
 const fund = (schemeName: string, viewId: string, week: number, vsPeer: number) => ({ schemeName, viewId, windows: { "1W": { fund: { returnPct: week }, vsPeerPp: vsPeer } } });
 
@@ -32,20 +32,24 @@ describe("WhatsApp message with key insights", () => {
   });
 
   it("includes the overall verdict (without repeating it), one line per fund, and the market", () => {
-    const body = renderWhatsAppBody(whatsappPdfParams(report, URL_, { isTest: false }));
+    const params = whatsappPdfParams(report, URL_, { isTest: false });
+    const body = renderWhatsAppBody(params);
     expect(body).toMatch(/\*Overall:\* No action needed\. Three funds fell/);
     expect(body).not.toMatch(/No action is needed this week/);
-    expect(body).toMatch(/🚀 HDFC Mid Cap \+0\.17% \(slightly ahead of similar funds\)/);
+    expect(body).toMatch(/🚀 HDFC Mid Cap \+0\.17% \(slightly ahead\)/);
     expect(body).toMatch(/🌱 Nippon India Small Cap 0\.00%/);
-    expect(body).toMatch(/🌎 Axis NASDAQ 100 \+2\.28% \(ahead of similar funds\)/);
+    expect(body).toMatch(/🌎 Axis NASDAQ 100 \+2\.28% \(ahead\)/);
     expect(body).toMatch(/The RBI raised rates to 5\.50%/); // sentences are not split inside numbers
-    expect(body.length).toBeLessThanOrEqual(WHATSAPP_BODY_LIMIT);
+    expect(whatsappMetaSize(params)).toBeLessThanOrEqual(WHATSAPP_BODY_LIMIT);
   });
 
   it("keeps a very long market summary within WhatsApp's limit", () => {
     const long = JSON.parse(JSON.stringify(report));
     long.report.output.marketSummary.text = Array.from({ length: 30 }, (_, i) => `Sentence number ${i} about the market this week.`).join(" ");
-    expect(renderWhatsAppBody(whatsappPdfParams(long, URL_, { isTest: false })).length).toBeLessThanOrEqual(WHATSAPP_BODY_LIMIT);
+    // Emoji and "—" make the byte count larger than the character count; the byte count must fit.
+    long.report.output.assessment.reason = "Calm week — " + "no fund has a problem of its own — ".repeat(12);
+    const params = whatsappPdfParams(long, URL_, { isTest: true });
+    expect(whatsappMetaSize(params)).toBeLessThanOrEqual(WHATSAPP_BODY_LIMIT);
   });
 });
 
@@ -86,7 +90,7 @@ describe("WhatsApp delivery order", () => {
     expect([sent(f, 0).name, sent(f, 1).name, sent(f, 2).name]).toEqual(["weekly_fund_report_pdf_v2", "weekly_fund_report_pdf", "weekly_fund_report"]);
     expect(sent(f, 1).components[1].parameters).toHaveLength(4);
     expect(r.providerMessageId).toBe("wamid.3");
-    expect(r.detail).toMatch(/not approved yet/);
+    expect(r.detail).toMatch(/could not be used/);
   });
 
   it("stops at the short PDF template when that one is approved", async () => {
