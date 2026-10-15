@@ -73,7 +73,14 @@ async function DashboardContent({ searchParams }: { searchParams: PageProps<"/">
       configured: d.integrations.whatsapp,
       recipient: whatsappRecipientMasked(),
       last: lastOf("whatsapp"),
-      note: wa.approved ? null : wa.pending.length ? "Set up and tested — waiting for Meta to approve the message template. Email and Telegram cover it meanwhile." : null,
+      paused: Boolean(d.integrations.whatsapp && !wa.approved && wa.error),
+      note: wa.approved
+        ? null
+        : wa.pending.length
+          ? "Set up and tested — waiting for Meta to approve the message template. Email and Telegram cover it meanwhile."
+          : d.integrations.whatsapp && wa.error
+            ? "Paused — Meta is not accepting our WhatsApp connection right now. Email and Telegram still deliver, and the Send to WhatsApp button still works."
+            : null,
     },
   ];
 

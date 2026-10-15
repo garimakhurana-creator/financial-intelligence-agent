@@ -15,6 +15,8 @@ export interface ChannelInfo {
   /** Latest real (Saturday) delivery of the current report, if any. */
   last: { status: string; at: string; isTest: boolean } | null;
   note: string | null;
+  /** Set up, but the provider is refusing our connection right now. */
+  paused?: boolean;
 }
 
 const META: Record<ChannelInfo["id"], { emoji: string; name: string; what: string }> = {
@@ -110,7 +112,7 @@ export function DeliveryCard({ reportId, channels, nextSend, inDrawer = false }:
                     !c.configured ? "bg-muted text-muted-foreground" : c.note ? "bg-[var(--tint-warning)]" : "bg-[var(--tint-good)]",
                   )}
                 >
-                  {!c.configured ? "Not set up" : c.note ? "Almost ready" : "Ready"}
+                  {!c.configured ? "Not set up" : c.paused ? "Paused" : c.note ? "Almost ready" : "Ready"}
                 </span>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">{m.what}</p>
